@@ -350,10 +350,19 @@ function goOffline() { clearInterval(beat); saveStatus(false); }
 document.addEventListener('visibilitychange', function () { if (!document.getElementById('adminOut')) return; if (document.hidden) goOffline(); else goOnline(); });
 window.addEventListener('pagehide', function () { if (document.getElementById('adminOut')) goOffline(); });
 async function syncAdminSupabaseIdentity() {
+  window.MURMUR_ADMIN_IDS = { firebaseUid: null, supabaseId: null, status: 'checking' };
   try {
-    var token = await getToken();
-    if (!token) return;
-    var mod = await import('https://esm.sh/@supabase/supabase-js@2');
+    // Refresh the Firebase REST token to pick up server-assigned custom claims.
+    var token = await refreshToken();
+    if (!token) throw new Error('Firebase session token is unavailable');
+    var payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    window.MURMUR_ADMIN_IDS.firebaseUid = payload.sub || null;
+    if (payload.role !== 'authenticated') {
+      window.MURMUR_ADMIN_IDS.status = 'missing-firebase-role-claim';
+      console.warn('Supabase connection needs Firebase custom claim role=authenticated. Configure it securely with Firebase Admin SDK, then sign in again.');
+      return;
+    }
+    var mod = await import('https://esm.sh/@supabase/supabase-js@2.57.4');
     window.murmurAdminSupabase ||= mod.createClient(
       'https://pkadftvqslkykehcqedj.supabase.co',
       'sb_publishable_etoHiUGbJ96MUPzJABL12A_UiTWVxok',
@@ -361,11 +370,13 @@ async function syncAdminSupabaseIdentity() {
     );
     var result = await window.murmurAdminSupabase.rpc('ensure_murmur_user');
     if (result.error) throw result.error;
-    var payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
-    window.MURMUR_ADMIN_IDS = { firebaseUid: payload.sub, supabaseId: result.data };
-    console.info('Murmur admin identity linked', window.MURMUR_ADMIN_IDS);
+    if (!result.data) throw new Error('ensure_murmur_user returned no Supabase UUID');
+    window.MURMUR_ADMIN_IDS = { firebaseUid: payload.sub, supabaseId: result.data, status: 'connected' };
+    console.info('Murmur admin Firebase/Supabase identity linked', window.MURMUR_ADMIN_IDS);
   } catch (error) {
-    console.warn('Admin Supabase identity sync is not ready:', error.message || error);
+    window.MURMUR_ADMIN_IDS.status = 'sync-error';
+    window.MURMUR_ADMIN_IDS.error = String(error && error.message || error);
+    console.warn('Admin Supabase identity sync is not ready:', window.MURMUR_ADMIN_IDS.error);
   }
 }
 function enter() {
