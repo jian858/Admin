@@ -154,7 +154,7 @@ function getToken() { return !AUTH.token ? Promise.resolve('') : (Date.now() < A
         return `<div class="adm-card">
           <div class="adm-row"><span class="adm-tag${status === 'resolved' ? '' : ' red'}">${statusLabel}</span><b class="adm-grow">${esc(r.category || 'Customer support')}</b><small>${ago(r.createdAt)}</small></div>
           <p><b>${esc(r.reason || 'Customer support request')}</b></p>
-          <p class="adm-support-details">${esc(r.details || 'No details provided').replace(/\\n/g, '<br>')}</p>
+          <p class="adm-support-details">${esc(r.details || 'No details provided')}</p>
           <small>From ${esc(sender)} · User ID: ${esc(r.by || 'Unavailable')}</small>
           <div class="adm-row">
             ${status !== 'in_progress' ? `<button type="button" class="adm-btn" data-act="supportstatus" data-id="${esc(id)}" data-status="in_progress">Mark in progress</button>` : ''}
