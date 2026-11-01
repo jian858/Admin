@@ -403,12 +403,13 @@ function nice(e) {
     : 'Could not log in. (' + m + ')';
 }
 async function signIn(email, pass) {
-  var j;
-  try { j = await authCall(IDT + 'signInWithPassword', { email: email, password: pass, returnSecureToken: true }); }
-  catch (e) {
-    if (!/EMAIL_NOT_FOUND|INVALID_LOGIN|INVALID_PASSWORD/.test(e.message)) throw e;
-    j = await authCall(IDT + 'signUp', { email: email, password: pass, returnSecureToken: true });   // first time: creates the admin account
-  }
+  // Admin login must never create an account automatically.
+  // Create/authorize admin accounts separately in Firebase Authentication.
+  var j = await authCall(IDT + 'signInWithPassword', {
+    email: email,
+    password: pass,
+    returnSecureToken: true
+  });
   adopt(j);
 }
 document.getElementById('loginForm').addEventListener('submit', async function (e) {
