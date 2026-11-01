@@ -74,6 +74,7 @@ html[data-theme="dark"] .adm { background: var(--bg); }
 textarea.adm-in { min-height: 90px; resize: vertical; }
 .adm-tag { display: inline-block; border-radius: 999px; padding: 2px 10px; background: var(--soft); font-size: 0.76rem; font-weight: 700; }
 .adm-tag.red { background: rgba(179,38,30,0.12); color: var(--danger); }
+.reason-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.reason-tile{display:flex;align-items:center;gap:8px;text-align:left;padding:9px;border:1px solid var(--line);border-radius:12px;background:var(--field);color:var(--ink);min-height:58px}.reason-tile span{font-size:1.55rem}.reason-tile small{font-size:.76rem}.reason-tile.selected{border:2px solid var(--acc-strong);background:rgba(20,200,160,.12)}
 .adm-msg { padding: 10px 14px; border-radius: 12px; background: rgba(20,200,160,0.12); color: var(--ink); font-size: 0.9rem; }
 .adm-top [data-act="close"] { display: none; }
 @media (prefers-reduced-motion: no-preference) {
@@ -163,7 +164,9 @@ function getToken() { return !AUTH.token ? Promise.resolve('') : (Date.now() < A
   const KEYS = { users: 'users', posts: 'posts', reports: 'reports', ann: 'announcements', reels: 'reels', appeals: 'appeals', deleted: 'deletedAccounts', log: 'auditLog', status: 'adminStatus', susp: 'suspended', stories: 'stories', notes: 'notes' };
   const ICONS = { overview: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>', reports: '<path d="M5 21V4M5 4h12l-2 4 2 4H5"/>', users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17" cy="9" r="2.6"/><path d="M17 14c2.8 0 4.7 1.8 4.7 4.5"/>', posts: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/>', ann: '<path d="M4 10v4h3l8 4V6L7 10z"/><path d="M18 9a4 4 0 0 1 0 6"/>', appeals: '<path d="M4 5h16v11H9l-5 4z"/>', deleted: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>', log: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', reels: '<rect x="3" y="4" width="18" height="16" rx="4"/><path d="M10 9l5 3-5 3z"/>' };
   const TABS = [['overview', 'Overview'], ['reports', 'Reports'], ['users', 'Users'], ['appeals', 'Appeals'], ['deleted', 'Deleted'], ['posts', 'Posts'], ['reels', 'Reels'], ['log', 'Activity'], ['ann', 'Announce']];
-  let D = {}, subs = [], el = null, tab = 'overview', q = '', armed = '', armT = null, suspUid = '', suspWhy = '', suspMode = 'susp', replyDraft = {}, msg = '';
+  let D = {}, subs = [], el = null, tab = 'overview', q = '', armed = '', armT = null, suspUid = '', suspWhy = '', suspMode = 'susp', suspReasonCode = '', suspUntil = '', replyDraft = {}, msg = '';
+  const ACCOUNT_REASONS = [{id:'spam',icon:'📨',label:'Spam or repeated unwanted activity'},{id:'harassment',icon:'🛑',label:'Harassment or bullying'},{id:'hate',icon:'🚫',label:'Hateful or abusive content'},{id:'impersonation',icon:'🎭',label:'Impersonation or fake identity'},{id:'scam',icon:'⚠️',label:'Scams, fraud, or deception'},{id:'unsafe',icon:'🧨',label:'Threats or dangerous content'},{id:'privacy',icon:'🔒',label:'Sharing private information'},{id:'sexual',icon:'🔞',label:'Sexual or inappropriate content'},{id:'copyright',icon:'©️',label:'Copyright or intellectual-property violation'},{id:'other',icon:'📝',label:'Other policy violation'}];
+  const reasonLabel = id => (ACCOUNT_REASONS.find(x => x.id === id) || ACCOUNT_REASONS[9]).label;
   let draft = { title: '', body: '', kind: 'info', pin: false, hrs: '0' };
 
   const fmt = c => (c || '').replace(/(.{4})(?=.)/g, '$1-');
@@ -176,15 +179,14 @@ function getToken() { return !AUTH.token ? Promise.resolve('') : (Date.now() < A
   const delPost = id => Promise.all([remove(ref(db, 'posts/' + id)), remove(ref(db, 'comments/' + id))]);
   const read = p => F.get(ref(db, p));
   const logAct = (action, uid, reason) => push(ref(db, 'auditLog'), { action, uid, name: nm(uid), reason: reason || '', at: serverTimestamp() });
-  const suspend = async (uid, why) => { const reason = (why || '').trim().slice(0, 120) || 'You broke the Murmur rules.'; await set(ref(db, 'suspended/' + uid), { reason, createdAt: serverTimestamp() }); await logAct('suspend', uid, reason); };
-  /* delete = soft delete: everything is saved in deletedAccounts/<uid> so it can be recovered */
-  async function deleteAccount(uid, why) {
-    const reason = (why || '').trim().slice(0, 120), u = (D.users || {})[uid] || {}, pr = await read('profiles/' + uid).catch(() => null), posts = {};
-    entries('posts').forEach(([id, p]) => { if (p.authorUid === uid) posts[id] = p; });
-    await set(ref(db, 'deletedAccounts/' + uid), { name: u.name || nm(uid), username: u.username || '', reason, deletedAt: serverTimestamp(), status: 'deleted', profile: pr || null, posts });
-    await set(ref(db, 'suspended/' + uid), { reason, deleted: true, createdAt: serverTimestamp() });
-    await Promise.all([remove(ref(db, 'profiles/' + uid)), remove(ref(db, 'stories/' + uid)), remove(ref(db, 'notes/' + uid))].concat(Object.keys(posts).map(delPost)));
-    await logAct('delete', uid, reason);
+  const suspend = async (uid, reasonCode, until) => { const reason = reasonLabel(reasonCode), expiresAt = Number(until); if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) throw new Error('Choose a future suspension end time.'); await set(ref(db, 'suspended/' + uid), { reason, reasonCode, createdAt: serverTimestamp(), expiresAt, deleted: false }); await logAct('suspend', uid, reason + ' · until ' + new Date(expiresAt).toISOString()); };
+  /* Scheduled deletion keeps the account recoverable during the grace period. A trusted server scheduler is required for final data removal at deleteAt. */
+  async function deleteAccount(uid, reasonCode, deleteAt) {
+    const reason = reasonLabel(reasonCode), scheduledFor = Number(deleteAt), u = (D.users || {})[uid] || {};
+    if (!Number.isFinite(scheduledFor) || scheduledFor <= Date.now()) throw new Error('Choose a future deletion date and time.');
+    await set(ref(db, 'deletedAccounts/' + uid), { name: u.name || nm(uid), username: u.username || '', reason, reasonCode, status: 'scheduled', scheduledFor });
+    await set(ref(db, 'suspended/' + uid), { reason, reasonCode, scheduledDelete: true, deleteAt: scheduledFor, createdAt: serverTimestamp(), deleted: false });
+    await logAct('schedule-delete', uid, reason + ' · scheduled ' + new Date(scheduledFor).toISOString());
   }
   /* every user's 16-character ID lives only in the database: users/<uid>/code, profiles/<uid>/code and the list codes/<ID> */
   async function createMissingIds() {
@@ -263,11 +265,11 @@ function getToken() { return !AUTH.token ? Promise.resolve('') : (Date.now() < A
       }).join('') : '<p class="adm-muted">No appeals.</p>';
     }
     if (tab === 'deleted') {
-      const list = entries('deleted').sort((a, b) => (b[1].deletedAt || 0) - (a[1].deletedAt || 0));
+      const list = entries('deleted').sort((a, b) => (b[1].deletedAt || b[1].scheduledFor || 0) - (a[1].deletedAt || a[1].scheduledFor || 0));
       return list.length ? list.map(([uid, d]) => `<div class="adm-card"><div class="adm-row"><div class="adm-grow"><b>${esc(d.name)}</b><br /><small>${esc(d.username)}</small></div><span class="adm-tag${d.status === 'deleted' ? ' red' : ''}">${esc(d.status)}</span></div><p><small>Reason:</small> ${esc(d.reason)}</p><small>Deleted ${ago(d.deletedAt) === 'now' ? 'just now' : ago(d.deletedAt) + ' ago'} · ${Object.keys(d.posts || {}).length} posts saved${d.status === 'recovered' ? ' · recovered ' + (ago(d.recoveredAt) === 'now' ? 'just now' : ago(d.recoveredAt) + ' ago') : ''}</small>${d.status === 'deleted' ? `<div class="adm-row">${btn('blue', 'recover', uid, 'Recover account')}</div>` : ''}</div>`).join('') : '<p class="adm-muted">No deleted accounts.</p>';
     }
     if (tab === 'log') {
-      const L = { delete: 'Deleted account', recover: 'Recovered account', suspend: 'Suspended', unsuspend: 'Unsuspended', 'appeal-approved': 'Appeal approved', 'appeal-declined': 'Appeal declined' };
+      const L = { 'schedule-delete': 'Deletion scheduled', delete: 'Deleted account', recover: 'Recovered account', suspend: 'Suspended', unsuspend: 'Unsuspended', 'appeal-approved': 'Appeal approved', 'appeal-declined': 'Appeal declined' };
       const list = entries('log').sort((a, b) => (b[1].at || 0) - (a[1].at || 0)).slice(0, 100);
       return list.length ? list.map(([, l]) => `<div class="adm-card"><div class="adm-row"><b class="adm-grow">${esc(L[l.action] || l.action)}</b><small>${ago(l.at)}</small></div><p>${esc(l.name || nm(l.uid))}</p>${l.reason ? `<small>Reason: ${esc(l.reason)}</small>` : ''}</div>`).join('') : '<p class="adm-muted">No activity yet.</p>';
     }
@@ -285,7 +287,7 @@ function getToken() { return !AUTH.token ? Promise.resolve('') : (Date.now() < A
       <label class="adm-row"><input type="checkbox" data-d="pin"${draft.pin ? ' checked' : ''} /> Pin to the top</label><button type="button" class="adm-btn blue" data-act="postann">Publish</button></div>`
       + list.map(([id, a]) => `<div class="adm-card"><div class="adm-row"><b class="adm-grow">${esc(a.title)}</b>${a.pinned ? '<span class="adm-tag">Pinned</span>' : ''}<small>${ago(a.createdAt)}</small></div><p>${esc(a.body)}</p><div class="adm-row">${btn('red', 'delann', id, 'Delete')}</div></div>`).join('');
   }
-  function suspForm() { return `<div class="adm-row"><input class="adm-in adm-grow" data-why placeholder="Reason (shown to the user, who can appeal)" maxlength="120" value="${esc(suspWhy)}" /><button type="button" class="adm-btn red" data-act="dosusp">${suspMode === 'del' ? 'Delete account' : 'Suspend'}</button><button type="button" class="adm-btn" data-act="nosusp">Cancel</button></div>`; }
+  function suspForm() { return `<div class="adm-card"><b>${suspMode === 'del' ? 'Schedule account deletion' : 'Suspend account'}</b><small>Choose one of these 10 illustrated reasons. A reason and a future date/time are required.</small><div class="reason-grid">${ACCOUNT_REASONS.map(r => `<button type="button" class="reason-tile${suspReasonCode === r.id ? ' selected' : ''}" data-reason="${r.id}"><span>${r.icon}</span><small>${esc(r.label)}</small></button>`).join('')}</div><label><small>${suspMode === 'del' ? 'Delete account at' : 'Suspension ends at'}</small><input class="adm-in" type="datetime-local" data-until value="${esc(suspUntil)}" required /></label><div class="adm-row"><button type="button" class="adm-btn red" data-act="dosusp">${suspMode === 'del' ? 'Schedule deletion' : 'Suspend account'}</button><button type="button" class="adm-btn" data-act="nosusp">Cancel</button></div></div>`; }
 
   function render() {
     if (!el) return;
@@ -309,17 +311,20 @@ function getToken() { return !AUTH.token ? Promise.resolve('') : (Date.now() < A
       const b = e.target.closest('[data-act]'); if (!b) return;
       const a = b.dataset.act, id = b.dataset.id;
       if (a === 'close') { subs.forEach(u => u()); subs = []; el.remove(); el = null; return; }
-      if (a === 'asksusp') { suspUid = id; suspWhy = ''; suspMode = 'susp'; render(); return; }
+      if (a === 'asksusp') { suspUid = id; suspWhy = ''; suspReasonCode = ''; suspUntil = ''; suspMode = 'susp'; render(); return; }
       if (a === 'mkcodes') { run(async () => { await createMissingIds(); }, 'IDs created for the users who had none.'); return; }
-      if (a === 'askdel') { suspUid = id; suspWhy = ''; suspMode = 'del'; render(); return; }
+      if (a === 'askdel') { suspUid = id; suspWhy = ''; suspReasonCode = ''; suspUntil = ''; suspMode = 'del'; render(); return; }
       if (a === 'recover') { run(() => recoverAccount(id), nm(id) + ' was recovered.'); return; }
       if (a === 'approve') { run(() => decideAppeal(id, true), 'Appeal approved.'); return; }
       if (a === 'decline') { run(() => decideAppeal(id, false), 'Appeal declined.'); return; }
-      if (a === 'nosusp') { suspUid = ''; render(); return; }
+      if (a === 'nosusp') { suspUid = ''; suspReasonCode = ''; suspUntil = ''; render(); return; }
+      if (b.dataset.reason) { suspReasonCode = b.dataset.reason; render(); return; }
       if (a === 'dosusp') {
-        if (!suspWhy.trim()) { msg = 'Write a reason first. The user will see it and can appeal.'; render(); return; }
-        const u = suspUid, w = suspWhy, m = suspMode; suspUid = '';
-        run(() => m === 'del' ? deleteAccount(u, w) : suspend(u, w), m === 'del' ? nm(u) + ' was deleted. You can recover it in the Deleted tab.' : nm(u) + ' is suspended.'); return;
+        if (!suspReasonCode) { msg = 'Select one of the 10 reasons first.'; render(); return; }
+        const when = Date.parse(suspUntil);
+        if (!suspUntil || !Number.isFinite(when) || when <= Date.now()) { msg = 'Choose a future date and time first.'; render(); return; }
+        const u = suspUid, code = suspReasonCode, m = suspMode; suspUid = ''; suspReasonCode = ''; suspUntil = '';
+        run(() => m === 'del' ? deleteAccount(u, code, when) : suspend(u, code, when), m === 'del' ? nm(u) + ' has a scheduled deletion. It remains recoverable until the scheduled time.' : nm(u) + ' is suspended until the selected time.'); return;
       }
       if (a === 'postann') {
         if (!draft.title.trim() || !draft.body.trim()) { msg = 'Add a title and a message.'; render(); return; }
@@ -339,8 +344,10 @@ function getToken() { return !AUTH.token ? Promise.resolve('') : (Date.now() < A
       const t = e.target;
       if (t.dataset.q !== undefined) { q = t.value; render(); }
       else if (t.dataset.why !== undefined) suspWhy = t.value;
+      else if (t.dataset.until !== undefined) suspUntil = t.value;
       else if (t.dataset.reply) replyDraft[t.dataset.reply] = t.value;
       else if (t.dataset.d) draft[t.dataset.d] = t.type === 'checkbox' ? t.checked : t.value;
+      if (t.dataset.until !== undefined) suspUntil = t.value;
     });
     el.addEventListener('change', e => { const t = e.target; if (t.dataset.d) draft[t.dataset.d] = t.type === 'checkbox' ? t.checked : t.value; });
   }
