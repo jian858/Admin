@@ -11,10 +11,8 @@
 <meta name="robots" content="noindex" />
 <title>Murmur Admin</title>
 <!--
-  MURMUR ADMIN  -  modular page (HTML, CSS, shared restrictions and Admin logic are separate files)
-  Put it next to your app file. Open it, log in with an admin account.
-  An account is an admin when  admins/<its uid> = true  in your Realtime Database.
-  Tabs: Overview, Reports, Users, Posts, Announce.
+  MURMUR ADMIN — Supabase Auth + server-verified admin allowlist.
+  Privileged reads and writes run through the murmur-admin-supabase Edge Function.
 -->
 <link rel="stylesheet" href="./styles.css" />
 <script>try { var t = localStorage.getItem('murmur-theme'); document.documentElement.dataset.theme = (t === 'dark' || t === 'light') ? t : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); } catch (e) {}</script>
@@ -33,7 +31,7 @@
   </form>
 </div>
 
-<script src="./account-restrictions.js"></script>
-<script src="./admin.js?v=ce5d51c7"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./admin-supabase.js?v=1"></script>
 </body>
 </html>
