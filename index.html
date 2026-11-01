@@ -237,8 +237,10 @@ function getToken() { return !AUTH.token ? Promise.resolve('') : (Date.now() < A
     if (tab === 'users') {
       const s = q.trim().toLowerCase();
       const accountIds = window.MURMUR_ADMIN_IDS && window.MURMUR_ADMIN_IDS.accountIds || {};
+      const idsState = window.MURMUR_ADMIN_IDS || {};
+      const idsNotice = idsState.idsStatus === 'loaded' ? '<div class="adm-msg">Account IDs loaded. Only the authorized admin can retrieve them.</div>' : idsState.idsStatus === 'error' ? `<div class="adm-msg">Account IDs unavailable: ${esc(idsState.idsError || 'Admin authorization or Firebase setup is incomplete.')}</div>` : '<div class="adm-msg">Loading account IDs…</div>';
       const list = entries('users').filter(([uid, u]) => !s || ((uid || '') + ' ' + (accountIds[uid] || '') + ' ' + (u.name || '') + ' ' + (u.username || '') + ' ' + (u.code || '') + ' ' + fmt(u.code)).toLowerCase().includes(s)).sort((a, b) => (a[1].name || '').localeCompare(b[1].name || ''));
-      return missingIdsCard() + `<input class="adm-in" data-q placeholder="Search name, @username or 16-character ID" value="${esc(q)}" />` + (list.map(([uid, u]) => {
+      return missingIdsCard() + idsNotice + `<input class="adm-in" data-q placeholder="Search name, @username, Firebase UID or Supabase UUID" value="${esc(q)}" />` + (list.map(([uid, u]) => {
         const sus = (D.susp || {})[uid], st = (D.stories || {})[uid], dl = (D.deleted || {})[uid], isDel = dl && dl.status === 'deleted';
         const supabaseId = accountIds[uid] || '';
         return `<div class="adm-card"><div class="adm-row"><div class="adm-grow"><b>${esc(u.name || 'Unknown')}</b><br /><small>${esc(u.username || '')}${u.code ? ' · ID ' + fmt(u.code) : ''}</small></div>${isDel ? '<span class="adm-tag red">Deleted</span>' : sus ? '<span class="adm-tag red">Suspended</span>' : ''}</div>
@@ -364,6 +366,9 @@ async function syncAdminSupabaseIdentity() {
     window.MURMUR_ADMIN_IDS.firebaseUid = payload.sub || null;
     if (payload.role !== 'authenticated') {
       window.MURMUR_ADMIN_IDS.status = 'missing-firebase-role-claim';
+      window.MURMUR_ADMIN_IDS.idsStatus = 'error';
+      window.MURMUR_ADMIN_IDS.idsError = 'Firebase role=authenticated claim is not configured yet.';
+      if (window.refreshMurmurAdminIds) window.refreshMurmurAdminIds();
       console.warn('Supabase connection needs Firebase custom claim role=authenticated. Configure it securely with Firebase Admin SDK, then sign in again.');
       return;
     }
@@ -389,7 +394,10 @@ async function syncAdminSupabaseIdentity() {
     console.info('Murmur admin Firebase/Supabase identity linked', window.MURMUR_ADMIN_IDS);
   } catch (error) {
     window.MURMUR_ADMIN_IDS.status = 'sync-error';
+    window.MURMUR_ADMIN_IDS.idsStatus = 'error';
     window.MURMUR_ADMIN_IDS.error = String(error && error.message || error);
+    window.MURMUR_ADMIN_IDS.idsError = window.MURMUR_ADMIN_IDS.error;
+    if (window.refreshMurmurAdminIds) window.refreshMurmurAdminIds();
     console.warn('Admin Supabase identity sync is not ready:', window.MURMUR_ADMIN_IDS.error);
   }
 }
