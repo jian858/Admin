@@ -349,8 +349,28 @@ function goOnline() { saveStatus(true); clearInterval(beat); beat = setInterval(
 function goOffline() { clearInterval(beat); saveStatus(false); }
 document.addEventListener('visibilitychange', function () { if (!document.getElementById('adminOut')) return; if (document.hidden) goOffline(); else goOnline(); });
 window.addEventListener('pagehide', function () { if (document.getElementById('adminOut')) goOffline(); });
+async function syncAdminSupabaseIdentity() {
+  try {
+    var token = await getToken();
+    if (!token) return;
+    var mod = await import('https://esm.sh/@supabase/supabase-js@2');
+    window.murmurAdminSupabase ||= mod.createClient(
+      'https://pkadftvqslkykehcqedj.supabase.co',
+      'sb_publishable_etoHiUGbJ96MUPzJABL12A_UiTWVxok',
+      { accessToken: async function () { return getToken(); } }
+    );
+    var result = await window.murmurAdminSupabase.rpc('ensure_murmur_user');
+    if (result.error) throw result.error;
+    var payload = JSON.parse(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')));
+    window.MURMUR_ADMIN_IDS = { firebaseUid: payload.sub, supabaseId: result.data };
+    console.info('Murmur admin identity linked', window.MURMUR_ADMIN_IDS);
+  } catch (error) {
+    console.warn('Admin Supabase identity sync is not ready:', error.message || error);
+  }
+}
 function enter() {
   gate.hidden = true;
+  syncAdminSupabaseIdentity();
   window.openMurmurAdmin();
   goOnline();
   var top = document.querySelector('.adm-top');
