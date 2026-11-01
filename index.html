@@ -308,7 +308,7 @@ function getToken() { return !AUTH.token ? Promise.resolve('') : (Date.now() < A
     render();
     el.addEventListener('click', e => {
       const t = e.target.closest('[data-tab]'); if (t) { tab = t.dataset.tab; msg = ''; el.dataset.anim = '1'; clearTimeout(openAdmin.t); openAdmin.t = setTimeout(() => { if (el) delete el.dataset.anim; }, 700); render(); return; }
-      const b = e.target.closest('[data-act]'); if (!b) return;
+      const b = e.target.closest('[data-act],[data-reason]'); if (!b) return;
       const a = b.dataset.act, id = b.dataset.id;
       if (a === 'close') { subs.forEach(u => u()); subs = []; el.remove(); el = null; return; }
       if (a === 'asksusp') { suspUid = id; suspWhy = ''; suspReasonCode = ''; suspUntil = ''; suspMode = 'susp'; render(); return; }
