@@ -204,6 +204,25 @@ function getToken() { return !AUTH.token ? Promise.resolve('') : (Date.now() < A
     return made;
   }
   const missingIdsCard = () => { const n = entries('users').filter(([id, u]) => !u.code && ((D.deleted || {})[id] || {}).status !== 'deleted').length; return n ? `<div class="adm-card"><div class="adm-row"><b class="adm-grow">${n} user${n === 1 ? ' has' : 's have'} no ID yet</b><button type="button" class="adm-btn blue" data-act="mkcodes">Create IDs</button></div></div>` : ''; };
+  const processingScheduled = new Set();
+  async function processScheduledDeletions() {
+    for (const [uid, item] of entries('deleted')) {
+      if (item.status !== 'scheduled' || Number(item.scheduledFor) > Date.now() || processingScheduled.has(uid)) continue;
+      processingScheduled.add(uid);
+      try {
+        const u = (D.users || {})[uid] || {}, profile = await read('profiles/' + uid).catch(() => null), posts = {};
+        entries('posts').forEach(([id, p]) => { if (p.authorUid === uid) posts[id] = p; });
+        await set(ref(db, 'deletedAccounts/' + uid), { ...item, name: item.name || u.name || nm(uid), username: item.username || u.username || '', status: 'deleted', deletedAt: serverTimestamp(), profile: profile || null, posts });
+        await set(ref(db, 'suspended/' + uid), { reason: item.reason, reasonCode: item.reasonCode, deleted: true, createdAt: serverTimestamp() });
+        await Promise.all([remove(ref(db, 'profiles/' + uid)), remove(ref(db, 'stories/' + uid)), remove(ref(db, 'notes/' + uid))].concat(Object.keys(posts).map(delPost)));
+        await logAct('delete', uid, item.reason || 'Scheduled deletion');
+      } catch (error) {
+        msg = 'Scheduled deletion for ' + nm(uid) + ' is waiting: ' + ((error && error.message) || 'permission denied');
+      } finally { processingScheduled.delete(uid); }
+    }
+    render();
+  }
+
   async function recoverAccount(uid) {
     const d = (D.deleted || {})[uid]; if (!d) return;
     const w = [remove(ref(db, 'suspended/' + uid)), set(ref(db, 'deletedAccounts/' + uid + '/status'), 'recovered'), set(ref(db, 'deletedAccounts/' + uid + '/recoveredAt'), serverTimestamp())];
@@ -304,7 +323,7 @@ function getToken() { return !AUTH.token ? Promise.resolve('') : (Date.now() < A
     el = document.createElement('div'); el.className = 'adm'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Admin panel');
     el.innerHTML = '<div class="adm-top"><button type="button" data-act="close" aria-label="Close" hidden></button><span class="adm-logo">murmur</span><span class="adm-badge">Admin</span></div><div class="adm-tabs"></div><div class="adm-body"></div>';
     document.body.appendChild(el); tab = 'overview'; msg = ''; D = {};
-    Object.entries(KEYS).forEach(([k, p]) => subs.push(onValue(ref(db, p), s => { D[k] = s.val() || {}; render(); }, () => {})));
+    Object.entries(KEYS).forEach(([k, p]) => subs.push(onValue(ref(db, p), s => { D[k] = s.val() || {}; render(); if (k === 'deleted') processScheduledDeletions(); }, () => {})));
     render();
     el.addEventListener('click', e => {
       const t = e.target.closest('[data-tab]'); if (t) { tab = t.dataset.tab; msg = ''; el.dataset.anim = '1'; clearTimeout(openAdmin.t); openAdmin.t = setTimeout(() => { if (el) delete el.dataset.anim; }, 700); render(); return; }
