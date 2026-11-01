@@ -62,7 +62,11 @@
       body: JSON.stringify({ action, ...(payload || {}) })
     });
     const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(result.error || "Admin request failed (" + response.status + ").");
+    if (!response.ok) {
+      const failure = new Error(result.error || "Admin request failed (" + response.status + ").");
+      failure.status = response.status;
+      throw failure;
+    }
     return result;
   }
 
@@ -205,7 +209,10 @@
       }
       notice("");
     } catch (error) {
-      content.innerHTML = '<div class="sa-empty">' + escapeHtml(error.message || "Could not load this section.") + '</div>';
+      content.innerHTML = '<div class="sa-empty" role="alert">' + escapeHtml(error.message || "Could not load this section.") + '</div>';
+      if (error.status === 401 || error.status === 403) {
+        notice("Access check failed. Please sign in with the authorized Super Admin account.");
+      }
     } finally {
       busy = false;
     }
@@ -265,11 +272,12 @@
       });
       if (error) throw error;
       if (!data.session) throw new Error("Supabase did not return a valid session.");
-      await api("overview");
       passwordInput.value = "";
       showShell();
     } catch (error) {
-      await client.auth.signOut().catch(() => {});
+      if (error.status === 401 || error.status === 403) {
+        await client.auth.signOut().catch(() => {});
+      }
       setError(error.message || "Could not sign in with Supabase.");
     } finally {
       submitButton.disabled = false;
@@ -280,13 +288,10 @@
     passwordInput.type = event.target.checked ? "text" : "password";
   });
 
-  client.auth.getSession().then(async ({ data, error }) => {
+  client.auth.getSession().then(({ data, error }) => {
     if (error || !data.session) return;
-    try {
-      await api("overview");
-      showShell();
-    } catch {
-      await client.auth.signOut();
-    }
+    // Keep a valid Supabase session during temporary API/database failures.
+    // The server still verifies the allowlist and super_admin role on every action.
+    showShell();
   });
 })();
