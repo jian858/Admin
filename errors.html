@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<meta name="robots" content="noindex" />
+<title>Murmur Error log</title>
+<!--
+  RULES FOR CHANGING THIS CODE
+  RULE 1: before you add a feature, clean up the code it touches.
+
+  MURMUR ERROR LOG  -  errors.html
+  Every error the Murmur app hits is saved in your database at errorLog/. This page lists them, lets you search and
+  filter, group repeats, download everything as murmur-error-log.txt, and clear them.
+  Put it next to the admin page (Admin repository). Log in with the admin account.
+-->
+<style>
+/* Same design as the Murmur app: teal accent, white header + tab bar, rounded cards, pill buttons. */
+:root { --sp-2: 8px; --sp-3: 12px; --sp-4: 16px; --sp-6: 24px; --bg: #e9edf2; --ink: #14213d; --muted: #6a778c; --line: rgba(20,33,61,0.12); --acc: #14c8a0; --acc-strong: #0fae8a; --on: #04261e; --danger: #b3261e; --card: #ffffff; --soft: #e8ecf1; --field: rgba(255,255,255,0.7); --shadow: 0 20px 50px rgba(14,32,46,0.12); color-scheme: light; }
+html[data-theme="dark"] { --bg: #121820; --ink: #e9eef6; --muted: #a3b0c4; --line: rgba(255,255,255,0.12); --card: #1c2430; --soft: #2a3442; --field: #2a3442; color-scheme: dark; }
+* { box-sizing: border-box; }
+html { -webkit-tap-highlight-color: transparent; }
+body { margin: 0; min-height: 100vh; font-family: system-ui, -apple-system, "Segoe UI", sans-serif; background: linear-gradient(180deg, #dff8f0 0%, var(--bg) 26%, #eef3f8 100%); color: var(--ink); }
+html[data-theme="dark"] body { background: var(--bg); }
+[hidden] { display: none !important; }
+button, input, select, textarea { font: inherit; }
+button { cursor: pointer; }
+
+/* login */
+.gate { min-height: 100vh; display: grid; place-items: center; padding: 16px; }
+.gate form { width: 100%; max-width: 380px; display: flex; flex-direction: column; gap: 12px; padding: 24px; background: rgba(255,255,255,0.72); border: 1px solid var(--line); border-radius: 20px; box-shadow: var(--shadow); backdrop-filter: blur(10px); }
+html[data-theme="dark"] .gate form { background: rgba(28,36,48,0.85); }
+.gate .logo { margin: 0; font-size: 2.6rem; font-weight: 800; letter-spacing: -0.06em; color: var(--acc-strong); line-height: 1; }
+.gate .sub { margin: 0 0 8px; color: var(--muted); font-weight: 600; }
+.gate input[type="email"], .gate input[type="password"], .gate input[type="text"] { width: 100%; border: 1px solid var(--line); background: var(--field); border-radius: 12px; padding: 10px 12px; color: var(--ink); outline: none; transition: border .2s ease, box-shadow .2s ease; }
+.gate input:focus { border-color: var(--acc); box-shadow: 0 0 0 4px rgba(20,200,160,0.12); }
+.gate .show { display: flex; align-items: center; gap: 8px; font-size: 0.9rem; color: var(--muted); }
+.gate .err { color: var(--danger); min-height: 1.2em; font-size: 0.9rem; overflow-wrap: anywhere; user-select: text; }
+.gate button[type="submit"], .gate #go { border: 0; border-radius: 999px; padding: 11px 12px; font-weight: 700; background: var(--acc); color: var(--on); transition: transform .2s ease, opacity .2s ease; }
+.gate button:active { transform: scale(0.98); }
+.gate button:disabled { opacity: 0.6; }
+
+/* panel */
+.adm { position: fixed; inset: 0; z-index: 400; display: flex; flex-direction: column; color: var(--ink); background: linear-gradient(180deg, #dff8f0 0%, var(--bg) 26%, #eef3f8 100%); padding-top: env(safe-area-inset-top, 0px); }
+html[data-theme="dark"] .adm { background: var(--bg); }
+.adm-top { display: flex; align-items: center; gap: 8px; padding: 7px 12px; background: var(--card); box-shadow: 0 1px 0 var(--line); }
+.adm-logo { font-size: 1.9rem; font-weight: 800; letter-spacing: -0.06em; color: var(--acc-strong); line-height: 1.2; }
+.adm-badge { padding: 3px 10px; border-radius: 999px; background: rgba(20,200,160,0.14); color: var(--acc-strong); font-size: 0.78rem; font-weight: 800; letter-spacing: 0.04em; text-transform: uppercase; }
+.adm-top .adm-btn { margin-left: auto; }
+.adm-tabs { display: flex; border-top: 1px solid var(--line); background: var(--card); overflow-x: auto; }
+.adm-tabs button { flex: 1 0 auto; min-width: 64px; position: relative; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; height: 54px; padding: 0 10px; border: 0; border-bottom: 3px solid transparent; background: none; color: var(--muted); font-size: 0.72rem; font-weight: 700; }
+.adm-tabs button.on { color: var(--acc-strong); border-bottom-color: var(--acc-strong); }
+.adm-tabs svg { width: 24px; height: 24px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.adm-tabs .adm-badge-n { position: absolute; top: 4px; left: calc(50% + 6px); min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: var(--danger); color: #fff; font-size: 0.7rem; font-style: normal; display: grid; place-items: center; }
+.adm-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 12px 12px calc(24px + env(safe-area-inset-bottom, 0px)); display: flex; flex-direction: column; gap: 8px; max-width: 760px; width: 100%; margin: 0 auto; }
+.adm-card, .adm-stat { background: var(--card); border: 1px solid var(--line); border-radius: 12px; }
+.adm-card { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
+.adm-card p { margin: 0; overflow-wrap: anywhere; }
+.adm-card small, .adm-muted { color: var(--muted); }
+.adm-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.adm-row > .adm-grow { flex: 1; min-width: 0; }
+.adm-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
+.adm-stat { padding: 16px; }
+.adm-stat b { display: block; font-size: 1.8rem; color: var(--acc-strong); }
+.adm-btn { border: 0; border-radius: 999px; padding: 8px 14px; font-weight: 700; background: var(--soft); color: var(--ink); transition: transform .2s ease, opacity .2s ease, background .2s ease; }
+.adm-btn:active { transform: scale(0.96); }
+.adm-btn.blue { background: var(--acc); color: var(--on); }
+.adm-btn.red { background: var(--danger); color: #fff; }
+.adm-in { width: 100%; border: 1px solid var(--line); background: var(--field); border-radius: 12px; padding: 10px 12px; color: var(--ink); outline: none; transition: border .2s ease, box-shadow .2s ease; }
+.adm-in:focus { border-color: var(--acc); box-shadow: 0 0 0 4px rgba(20,200,160,0.12); }
+textarea.adm-in { min-height: 90px; resize: vertical; }
+.adm-tag { display: inline-block; border-radius: 999px; padding: 2px 10px; background: var(--soft); font-size: 0.76rem; font-weight: 700; }
+.adm-tag.red { background: rgba(179,38,30,0.12); color: var(--danger); }
+.adm-pre { margin: 0; max-height: 120px; overflow: auto; padding: var(--sp-2); border-radius: 8px; background: var(--soft); font-size: 0.72rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+.adm-msg { padding: 10px 14px; border-radius: 12px; background: rgba(20,200,160,0.12); color: var(--ink); font-size: 0.9rem; }
+.adm-top [data-act="close"] { display: none; }
+@media (prefers-reduced-motion: no-preference) {
+  .adm { animation: admIn .3s ease-out both; }
+  .adm[data-anim] .adm-card, .adm[data-anim] .adm-stat { animation: rowIn .34s cubic-bezier(.2,.8,.2,1) both; }
+  .adm-tabs button, .adm-tabs svg { transition: color .22s ease, border-color .22s ease, transform .25s cubic-bezier(.3,1.5,.5,1); }
+  .adm-tabs button.on svg { transform: scale(1.12); }
+  @keyframes rowIn { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: none; } }
+  @keyframes admIn { from { opacity: 0; transform: translateY(24px); } to { opacity: 1; transform: none; } }
+}
+
+/* error log page */
+.el-sticky { position: sticky; top: 0; z-index: 6; }
+.el-bar { display: flex; flex-direction: column; gap: var(--sp-2); padding: var(--sp-3) var(--sp-4); background: var(--card); box-shadow: 0 1px 0 var(--line); }
+.el-bar .adm-row { flex-wrap: wrap; }
+.el-bar select { width: auto; }
+.el-wrap { max-width: 760px; margin: 0 auto; padding: var(--sp-3) var(--sp-3) var(--sp-6); display: flex; flex-direction: column; gap: var(--sp-2); }
+.el-check { display: flex; align-items: center; gap: var(--sp-2); white-space: nowrap; }
+.el-count { color: var(--muted); font-size: 0.9rem; }
+.adm-pre { margin: 0; max-height: 140px; overflow: auto; padding: var(--sp-2); border-radius: 8px; background: var(--soft); font-size: 0.72rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+</style>
+<script>try { var t = localStorage.getItem('murmur-theme'); document.documentElement.dataset.theme = (t === 'dark' || t === 'light') ? t : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); } catch (e) {}</script>
+</head>
+<body>
+<div class="gate" id="gate">
+  <form id="loginForm">
+    <div class="logo">murmur</div>
+    <p class="sub">Error log</p>
+    <input id="email" type="email" placeholder="Admin email" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" required />
+    <input id="pass" type="password" placeholder="Password" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" required />
+    <label class="show"><input type="checkbox" id="showPass" /> Show password</label>
+    <div class="err" id="err" role="alert"></div>
+    <button type="submit" id="go">Log in</button>
+  </form>
+</div>
+
+<main id="app" hidden>
+  <div class="el-sticky">
+  <header class="adm-top el-top"><span class="adm-logo">murmur</span><span class="adm-badge">Error log</span><button type="button" class="adm-btn" id="out">Sign out</button></header>
+  <div class="el-bar">
+    <input class="adm-in" id="q" placeholder="Search message, user, screen or browser" aria-label="Search errors" />
+    <div class="adm-row">
+      <select class="adm-in" id="kind" aria-label="Kind"><option value="">All kinds</option><option value="crash">Crash</option><option value="handled">Handled</option><option value="database">Database</option></select>
+      <label class="el-check"><input type="checkbox" id="group" checked /> Group repeats</label>
+    </div>
+    <div class="adm-row">
+      <button type="button" class="adm-btn" id="refresh">Refresh</button>
+      <button type="button" class="adm-btn blue" id="dl">Download .txt</button>
+      <button type="button" class="adm-btn red" id="clear">Clear all</button>
+    </div>
+    <span class="el-count" id="count" role="status" aria-live="polite">Loading…</span>
+    <span class="el-count" id="refreshStatus">Refresh available when ready.</span>
+  </div>
+  </div>
+  <div class="el-wrap" id="list"></div>
+</main>
+
+<script>
+/* ---------- real Firebase sign-in (same admin account as the admin page) ---------- */
+var API_KEY = 'AIzaSyBRjnlDgDmLRkVncPYx34eNdYMI48L7q1M', BASE = 'https://murmur-fc430-default-rtdb.firebaseio.com', IDT = 'https://identitytoolkit.googleapis.com/v1/accounts:', ADMIN_VERIFY_URL = 'https://pkadftvqslkykehcqedj.supabase.co/functions/v1/murmur-admin', SUPABASE_PUBLIC_KEY = 'sb_publishable_etoHiUGbJ96MUPzJABL12A_UiTWVxok';
+var AUTH = { token: '', refresh: '', exp: 0 };
+function authCall(url, body) {
+  return fetch(url + '?key=' + API_KEY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+    .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error((j.error && j.error.message) || 'error'); return j; }); });
+}
+function adopt(j) {
+  AUTH.token = j.idToken || j.id_token; AUTH.refresh = j.refreshToken || j.refresh_token;
+  AUTH.exp = Date.now() + (Number(j.expiresIn || j.expires_in || 3600) - 120) * 1000;
+  try { localStorage.setItem('murmur-admin-rt', AUTH.refresh); } catch (e) {}
+}
+function refreshToken() {
+  return fetch('https://securetoken.googleapis.com/v1/token?key=' + API_KEY, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'grant_type=refresh_token&refresh_token=' + encodeURIComponent(AUTH.refresh) })
+    .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error('session expired'); adopt(j); return AUTH.token; }); });
+}
+function getToken() { return Date.now() < AUTH.exp ? Promise.resolve(AUTH.token) : refreshToken(); }
+function verifyAdmin(token) {
+  return fetch(ADMIN_VERIFY_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token, 'apikey': SUPABASE_PUBLIC_KEY },
+    body: JSON.stringify({ action: 'overview' })
+  }).then(async function (r) {
+    var body = await r.json().catch(function () { return {}; });
+    if (!r.ok || !body.adminFirebaseUid || !body.adminUuid) {
+      throw new Error(body.error || 'This Firebase account is not authorized as a Murmur administrator.');
+    }
+    return body;
+  });
+}
+function db(method, path) {
+  return getToken().then(function (t) {
+    var safePath = path.split('/').map(encodeURIComponent).join('/');
+    return fetch(BASE + '/' + safePath + '.json?auth=' + encodeURIComponent(t), { method: method });
+  }).then(async function (r) {
+    var body = await r.json().catch(function () { return null; });
+    if (!r.ok) {
+      var detail = body && body.error && body.error.message;
+      throw new Error(r.status === 401 || r.status === 403 ? 'Database permission denied. Check Firebase Realtime Database rules.' : (detail || 'Database request failed (' + r.status + ').'));
+    }
+    return body;
+  });
+}
+
+/* ---------- log in ---------- */
+var gate = document.getElementById('gate'), msg = document.getElementById('err'), go = document.getElementById('go');
+function nice(e) {
+  var m = String(e && e.message || e);
+  return /EMAIL_EXISTS|INVALID_PASSWORD|INVALID_LOGIN/.test(m) ? 'Wrong password for this admin account.'
+    : /OPERATION_NOT_ALLOWED/.test(m) ? 'Email/password login is off. Firebase console > Authentication > Sign-in method > Email/Password > Enable.'
+    : /WEAK_PASSWORD/.test(m) ? 'Password must be at least 6 characters.'
+    : /TOO_MANY/.test(m) ? 'Too many tries. Wait a few minutes.'
+    : /Failed to fetch|NetworkError/.test(m) ? 'No internet connection.'
+    : 'Could not log in. (' + m + ')';
+}
+async function signIn(email, pass) {
+  var j = await authCall(IDT + 'signInWithPassword', { email: email, password: pass, returnSecureToken: true });
+  adopt(j);
+  await verifyAdmin(AUTH.token);
+}
+document.getElementById('showPass').addEventListener('change', function (e) { document.getElementById('pass').type = e.target.checked ? 'text' : 'password'; });
+document.getElementById('loginForm').addEventListener('submit', async function (e) {
+  e.preventDefault(); msg.textContent = ''; go.disabled = true;
+  var em = document.getElementById('email').value.trim().toLowerCase();
+  try { await signIn(em, document.getElementById('pass').value); start(); }
+  catch (x) { AUTH.token = ''; AUTH.refresh = ''; try { localStorage.removeItem('murmur-admin-rt'); } catch (e) {} msg.textContent = nice(x); go.disabled = false; }
+});
+document.getElementById('out').onclick = function () { try { localStorage.removeItem('murmur-admin-rt'); } catch (e) {} location.reload(); };
+try {
+  var rt = localStorage.getItem('murmur-admin-rt');
+  if (rt) { AUTH.refresh = rt; refreshToken().then(function () { return verifyAdmin(AUTH.token); }).then(start, function () { AUTH.token = ''; AUTH.refresh = ''; try { localStorage.removeItem('murmur-admin-rt'); } catch (e) {} }); }
+} catch (e) {}
+
+/* ---------- error list, safe actions, and five-minute refresh cooldown ---------- */
+var errors = {}, users = {}, armed = false, started = false, loading = false;
+var REFRESH_MS = 5 * 60 * 1000, LAST_REFRESH_KEY = 'murmur-error-log-last-refresh', CACHE_KEY = 'murmur-error-log-cache';
+var $ = function (id) { return document.getElementById(id); };
+var esc = function (t) { return String(t == null ? '' : t).replace(/[&<>"']/g, function (c) { return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]; }); };
+var who = function (uid) { return (users[uid] && users[uid].name) || uid || 'Unknown'; };
+var when = function (t) { return t ? new Date(t).toLocaleString() : ''; };
+function ago(t) { if (!t) return ''; var m = Math.round((Date.now() - t) / 6e4); return m < 1 ? 'just now' : m < 60 ? m + 'm ago' : m < 1440 ? Math.round(m / 60) + 'h ago' : Math.round(m / 1440) + 'd ago'; }
+function lastRefresh() { try { return Number(localStorage.getItem(LAST_REFRESH_KEY) || 0); } catch (e) { return 0; } }
+function remainingRefresh() { return Math.max(0, REFRESH_MS - (Date.now() - lastRefresh())); }
+function fmtWait(ms) { var sec = Math.ceil(ms / 1000); return Math.floor(sec / 60) + ':' + String(sec % 60).padStart(2, '0'); }
+function updateRefreshStatus() {
+  var left = remainingRefresh(), b = $('refresh');
+  if (b) { b.disabled = loading || left > 0; b.textContent = loading ? 'Refreshing…' : left > 0 ? 'Refresh in ' + fmtWait(left) : 'Refresh'; }
+  if ($('refreshStatus')) $('refreshStatus').textContent = left > 0 ? 'Next refresh in ' + fmtWait(left) + '. This page enforces a 5-minute cooldown in this browser only; it is not server-side rate limiting.' : 'Refresh is available.';
+}
+function rows() {
+  var q = $('q').value.trim().toLowerCase(), kind = $('kind').value;
+  return Object.keys(errors).map(function (id) { var e = Object.assign({}, errors[id] || {}); e.id = id; return e; })
+    .filter(function (e) { return (!kind || e.kind === kind) && (!q || (String(e.message || '') + ' ' + (e.note || '') + ' ' + (e.screen || '') + ' ' + (e.ua || '') + ' ' + who(e.uid)).toLowerCase().indexOf(q) >= 0); })
+    .sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
+}
+function render() {
+  var list = rows(), out = [];
+  if ($('group').checked) {
+    var g = {}; list.forEach(function (e) { var k = e.kind + '|' + e.message; (g[k] = g[k] || { first: e, ids: [] }).ids.push(e.id); });
+    out = Object.keys(g).map(function (k) { return { e: g[k].first, ids: g[k].ids }; });
+  } else out = list.map(function (e) { return { e: e, ids: [e.id] }; });
+  $('count').textContent = list.length + ' error' + (list.length === 1 ? '' : 's') + (out.length !== list.length ? ' · ' + out.length + ' different' : '');
+  $('list').innerHTML = out.slice(0, 150).map(function (x) {
+    var e = x.e;
+    return '<div class="adm-card"><div class="adm-row"><span class="adm-tag red">' + esc(e.kind || 'unknown') + '</span><b class="adm-grow">' + esc(e.message || '(no message)') + '</b>' + (x.ids.length > 1 ? '<span class="adm-tag">x' + x.ids.length + '</span>' : '') + '</div>'
+      + '<small>' + esc(who(e.uid)) + ' · ' + esc(e.screen || '') + ' · ' + esc(ago(e.createdAt)) + ' · ' + esc(when(e.createdAt)) + '</small>'
+      + '<small>' + esc((e.ua || '').slice(0, 90)) + '</small>' + (e.note ? '<small>' + esc(e.note) + '</small>' : '')
+      + (e.stack ? '<pre class="adm-pre">' + esc(e.stack) + '</pre>' : '')
+      + '<div class="adm-row"><button type="button" class="adm-btn" data-del="' + x.ids.map(esc).join(',') + '">Delete' + (x.ids.length > 1 ? ' all ' + x.ids.length : '') + '</button></div></div>';
+  }).join('') || '<p class="adm-muted">No errors found.</p>';
+}
+function cacheErrors() { try { localStorage.setItem(CACHE_KEY, JSON.stringify(errors)); } catch (e) {} }
+function restoreCache() {
+  try { var saved = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); if (saved && typeof saved === 'object') { errors = saved; render(); return true; } } catch (e) {}
+  return false;
+}
+async function load(force) {
+  if (loading) return;
+  var left = remainingRefresh();
+  if (!force && left > 0) { restoreCache(); updateRefreshStatus(); return; }
+  loading = true; updateRefreshStatus(); $('count').textContent = 'Loading errors…';
+  try {
+    errors = (await db('GET', 'errorLog')) || {};
+    users = {};
+    cacheErrors();
+    try { localStorage.setItem(LAST_REFRESH_KEY, String(Date.now())); } catch (e) {}
+    render();
+  } catch (e) {
+    $('count').textContent = 'Could not load errors: ' + String(e.message || e);
+  } finally { loading = false; updateRefreshStatus(); }
+}
+function download() {
+  var content = rows().reverse().map(function (e) {
+    var time = Number(e.createdAt || e.at || 0), date = time ? new Date(time).toISOString() : 'unknown time';
+    return '[' + date + '] ' + (e.kind || 'unknown') + '  ' + (e.message || '') + '\n  user: ' + who(e.uid) + ' (' + (e.uid || '') + ')  screen: ' + (e.screen || '') + '  page: ' + (e.page || '') + '\n  browser: ' + (e.ua || '')
+      + (e.note ? '\n  note: ' + e.note : '') + (e.stack ? '\n  ' + String(e.stack).split('\n').join('\n  ') : '');
+  }).join('\n\n') || 'No errors.';
+  var a = document.createElement('a'), url = URL.createObjectURL(new Blob([content], { type: 'text/plain;charset=utf-8' }));
+  a.href = url; a.download = 'murmur-error-log.txt'; a.click(); setTimeout(function () { URL.revokeObjectURL(url); }, 2000);
+}
+function start() {
+  if (started) return; started = true;
+  gate.hidden = true; $('app').hidden = false;
+  ['q', 'kind', 'group'].forEach(function (id) { $(id).addEventListener('input', render); });
+  $('dl').onclick = download;
+  $('refresh').onclick = function () { load(false); };
+  $('clear').onclick = async function () {
+    var typed = window.prompt('This permanently deletes every error in the log. Type DELETE ALL ERROR LOGS to continue.');
+    if (typed !== 'DELETE ALL ERROR LOGS') return;
+    if (!window.confirm('Final confirmation: permanently delete every error log? This cannot be undone.')) return;
+    $('clear').disabled = true;
+    try { await db('DELETE', 'errorLog'); errors = {}; cacheErrors(); render(); $('count').textContent = 'All error logs were deleted.'; }
+    catch (e) { $('count').textContent = 'Could not clear errors: ' + String(e.message || e); }
+    finally { $('clear').disabled = false; }
+  };
+  $('list').addEventListener('click', async function (e) {
+    var b = e.target.closest('[data-del]'); if (!b) return;
+    var ids = b.dataset.del.split(',');
+    if (!window.confirm('Delete ' + ids.length + ' selected error log item(s)?')) return;
+    b.disabled = true;
+    var deleted = [];
+    try {
+      for (var i = 0; i < ids.length; i++) {
+        await db('DELETE', 'errorLog/' + ids[i]);
+        deleted.push(ids[i]);
+      }
+      deleted.forEach(function (id) { delete errors[id]; });
+      cacheErrors();
+      render();
+    } catch (x) {
+      deleted.forEach(function (id) { delete errors[id]; });
+      cacheErrors();
+      render();
+      $('count').textContent = 'Some selected errors were deleted, but the rest failed: ' + String(x.message || x);
+    } finally { b.disabled = false; }
+  });
+  restoreCache();
+  load(false);
+  updateRefreshStatus();
+  setInterval(updateRefreshStatus, 1000);
+}
+</script>
+</body>
+</html>
