@@ -122,10 +122,10 @@
       if (activeTab === "overview") {
         const data = await api("overview");
         document.getElementById("saIdentity").textContent = data.admin.email + " · " + data.admin.role;
-        content.innerHTML = '<div class="sa-grid">' + Object.entries(data.counts).map(([name, count]) =>
-          '<article class="sa-card"><div class="sa-muted">' + escapeHtml(name.replace(/_/g, " ")) +
-          '</div><div class="sa-number">' + Number(count).toLocaleString() + '</div></article>'
-        ).join("") + '</div><section class="sa-panel"><h2>Administration status</h2><div class="sa-muted">Authenticated through Supabase Auth. All privileged actions are verified by the server-side admin allowlist.</div></section>';
+        content.innerHTML = '<div class="sa-section-heading"><div><span class="sa-kicker">CONTROL CENTER</span><h1>Overview</h1><p>Monitor your Murmur community and system activity.</p></div><span class="sa-live"><i></i> Connected session</span></div><div class="sa-grid">' + Object.entries(data.counts).map(([name, count]) =>
+          '<article class="sa-card"><div class="sa-card-top"><span class="sa-muted">' + escapeHtml(name.replace(/_/g, " ")) +
+          '</span><span class="sa-card-dot"></span></div><div class="sa-number">' + Number(count).toLocaleString() + '</div><div class="sa-card-foot">Current records</div></article>'
+        ).join("") + '</div><section class="sa-panel sa-security-panel"><div class="sa-security-mark">✓</div><div><h2>Administration protected</h2><p>Supabase Auth is active. Every privileged action is checked by the server-side Super Admin allowlist.</p></div></section>';
       } else if (activeTab === "users") {
         const data = await api("users");
         content.innerHTML = '<section class="sa-panel"><div class="sa-toolbar"><h2>Users</h2><input class="sa-search" id="saSearch" type="search" placeholder="Search users" aria-label="Search users"></div><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Account</th><th>Username</th><th>Created</th><th>Status</th><th>Action</th></tr></thead><tbody>' +
