@@ -86,6 +86,9 @@
           <button class="sa-btn" data-tab="users" type="button">Users</button>
           <button class="sa-btn" data-tab="reports" type="button">Reports</button>
           <button class="sa-btn" data-tab="posts" type="button">Posts</button>
+          <button class="sa-btn" data-tab="appeals" type="button">Appeals</button>
+          <button class="sa-btn" data-tab="announcements" type="button">Announcements</button>
+          <button class="sa-btn" data-tab="activity" type="button">Activity</button>
         </nav>
         <div id="saNotice" class="sa-message" hidden role="status"></div>
         <section id="saContent" aria-live="polite"><div class="sa-empty">Loading secure dashboard…</div></section>
@@ -130,7 +133,7 @@
         const data = await api("users");
         content.innerHTML = '<section class="sa-panel"><div class="sa-toolbar"><h2>Users</h2><input class="sa-search" id="saSearch" type="search" placeholder="Search users" aria-label="Search users"></div><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Account</th><th>Username</th><th>Created</th><th>Status</th><th>Action</th></tr></thead><tbody>' +
           data.users.map((user) => '<tr data-user-row="' + escapeHtml(user.id) + '"><td><strong>' + escapeHtml(user.display_name || "Unnamed") + '</strong><div class="sa-muted">' + escapeHtml(user.id) + '</div></td><td>' + escapeHtml(user.username || "—") + '</td><td>' + escapeHtml(dateLabel(user.created_at)) + '</td><td><span class="sa-status">' + (user.is_suspended ? "Suspended" : "Active") + '</span>' + (user.suspension_reason ? '<div class="sa-muted">' + escapeHtml(user.suspension_reason) + '</div>' : '') + '</td><td><div class="sa-cell-actions">' +
-          (user.is_suspended ? '<button class="sa-btn sa-small" data-unsuspend="' + escapeHtml(user.id) + '">Restore</button>' : '<button class="sa-btn danger sa-small" data-suspend="' + escapeHtml(user.id) + '">Suspend</button>') +
+          (user.is_suspended ? '<button class="sa-btn sa-small" data-unsuspend="' + escapeHtml(user.id) + '">Restore</button>' : '<button class="sa-btn danger sa-small" data-suspend="' + escapeHtml(user.id) + '">Suspend</button><button class="sa-btn danger sa-small" data-schedule-delete="' + escapeHtml(user.id) + '">Schedule deletion</button>') +
           '</div></td></tr>').join("") + '</tbody></table></div></section>';
         document.getElementById("saSearch").addEventListener("input", (event) => {
           const query = event.target.value.toLowerCase();
@@ -139,10 +142,22 @@
         content.querySelectorAll("[data-suspend]").forEach((button) => button.addEventListener("click", async () => {
           const reason = prompt("Enter the reason for suspension:");
           if (!reason || !reason.trim()) return;
-          await actionRun(() => api("set_user_status", { user_id: button.dataset.suspend, suspended: true, reason: reason.trim() }), "Account suspended.");
+          const duration = prompt("Suspension duration in hours. Leave blank for indefinite suspension:", "24");
+          if (duration === null) return;
+          await actionRun(() => api("set_user_status", { user_id: button.dataset.suspend, suspended: true, reason: reason.trim(), duration_hours: duration.trim() || null }), "Account suspended.");
         }));
         content.querySelectorAll("[data-unsuspend]").forEach((button) => button.addEventListener("click", async () => {
           await actionRun(() => api("set_user_status", { user_id: button.dataset.unsuspend, suspended: false }), "Account restored.");
+        }));
+        content.querySelectorAll("[data-schedule-delete]").forEach((button) => button.addEventListener("click", async () => {
+          const reason = prompt("Enter the reason for account deletion:");
+          if (!reason || !reason.trim()) return;
+          const when = prompt("Enter the deletion date and time (example: 2026-12-01T09:00):");
+          if (!when) return;
+          const date = new Date(when);
+          if (!Number.isFinite(date.getTime()) || date.getTime() <= Date.now()) { notice("Choose a valid future date and time."); return; }
+          if (!confirm("Schedule this account for deletion? The account will be suspended immediately.")) return;
+          await actionRun(() => api("schedule_delete", { user_id: button.dataset.scheduleDelete, reason: reason.trim(), delete_at: date.toISOString() }), "Deletion scheduled. Final deletion still requires the trusted server deletion worker.");
         }));
       } else if (activeTab === "reports") {
         const data = await api("reports");
@@ -161,6 +176,32 @@
           if (!confirm("Permanently delete this post?")) return;
           await actionRun(() => api("delete_post", { post_id: button.dataset.deletePost }), "Post deleted.");
         }));
+      } else if (activeTab === "appeals") {
+        const data = await api("appeals");
+        content.innerHTML = '<section class="sa-panel"><h2>Account appeals</h2><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Appeal</th><th>Account</th><th>Submitted</th><th>Status</th><th>Review</th></tr></thead><tbody>' +
+          data.appeals.map((appeal) => '<tr><td>' + escapeHtml(appeal.message) + '<div class="sa-muted">' + escapeHtml(appeal.id) + '</div></td><td>' + escapeHtml(appeal.user_id) + '</td><td>' + escapeHtml(dateLabel(appeal.created_at)) + '</td><td><span class="sa-status">' + escapeHtml(appeal.status) + '</span></td><td><button class="sa-btn sa-small" data-review-appeal="' + escapeHtml(appeal.id) + '" data-status="reviewing">Review</button> <button class="sa-btn sa-small" data-review-appeal="' + escapeHtml(appeal.id) + '" data-status="approved">Approve</button> <button class="sa-btn danger sa-small" data-review-appeal="' + escapeHtml(appeal.id) + '" data-status="rejected">Reject</button></td></tr>').join("") + '</tbody></table></div></section>';
+        content.querySelectorAll("[data-review-appeal]").forEach((button) => button.addEventListener("click", async () => {
+          const response = prompt("Optional response to the user:", "");
+          if (response === null) return;
+          await actionRun(() => api("update_appeal", { appeal_id: button.dataset.reviewAppeal, status: button.dataset.status, admin_response: response }), "Appeal updated.");
+        }));
+      } else if (activeTab === "announcements") {
+        const data = await api("announcements");
+        content.innerHTML = '<section class="sa-panel"><h2>Publish an announcement</h2><form id="saAnnouncementForm"><input class="sa-search" name="title" required maxlength="160" placeholder="Announcement title"><textarea class="sa-search" name="body" required maxlength="5000" rows="4" placeholder="Write an announcement" style="display:block;max-width:none;margin:10px 0"></textarea><div class="sa-actions"><select class="sa-search" name="kind"><option value="info">Information</option><option value="warning">Warning</option><option value="success">Success</option><option value="urgent">Urgent</option></select><label><input type="checkbox" name="pinned"> Pin announcement</label><button class="sa-btn primary" type="submit">Publish</button></div></form></section><section class="sa-panel"><h2>Published announcements</h2><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Announcement</th><th>Type</th><th>Published</th><th>Action</th></tr></thead><tbody>' +
+          data.announcements.map((item) => '<tr><td><strong>' + escapeHtml(item.title) + '</strong><div class="sa-muted">' + escapeHtml(item.body) + '</div></td><td>' + escapeHtml(item.kind) + '</td><td>' + escapeHtml(dateLabel(item.published_at)) + '</td><td><button class="sa-btn danger sa-small" data-delete-announcement="' + escapeHtml(item.id) + '">Delete</button></td></tr>').join("") + '</tbody></table></div></section>';
+        document.getElementById("saAnnouncementForm").addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const formData = new FormData(event.currentTarget);
+          await actionRun(() => api("create_announcement", { title: formData.get("title"), body: formData.get("body"), kind: formData.get("kind"), is_pinned: formData.get("pinned") === "on" }), "Announcement published.");
+        });
+        content.querySelectorAll("[data-delete-announcement]").forEach((button) => button.addEventListener("click", async () => {
+          if (!confirm("Delete this announcement?")) return;
+          await actionRun(() => api("delete_announcement", { announcement_id: button.dataset.deleteAnnouncement }), "Announcement deleted.");
+        }));
+      } else if (activeTab === "activity") {
+        const data = await api("activity");
+        content.innerHTML = '<section class="sa-panel"><h2>Admin activity log</h2><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Action</th><th>Target account</th><th>Reason</th><th>Date</th></tr></thead><tbody>' +
+          data.activity.map((item) => '<tr><td>' + escapeHtml(item.action) + '</td><td>' + escapeHtml(item.target_user_id || "—") + '</td><td>' + escapeHtml(item.reason || JSON.stringify(item.metadata || {})) + '</td><td>' + escapeHtml(dateLabel(item.created_at)) + '</td></tr>').join("") + '</tbody></table></div></section>';
       }
       notice("");
     } catch (error) {
