@@ -64,6 +64,7 @@ html[data-theme="dark"] .adm { background: var(--bg); }
 .adm-stat b { display: block; font-size: 1.8rem; color: var(--acc-strong); }
 .adm-btn { border: 0; border-radius: 999px; padding: 8px 14px; font-weight: 700; background: var(--soft); color: var(--ink); transition: transform .2s ease, opacity .2s ease, background .2s ease; }
 .adm-btn:active { transform: scale(0.96); }
+.el-test-link { display: inline-flex; align-items: center; text-decoration: none; }
 .adm-btn.blue { background: var(--acc); color: var(--on); }
 .adm-btn.red { background: var(--danger); color: #fff; }
 .adm-in { width: 100%; border: 1px solid var(--line); background: var(--field); border-radius: 12px; padding: 10px 12px; color: var(--ink); outline: none; transition: border .2s ease, box-shadow .2s ease; }
@@ -114,10 +115,11 @@ textarea.adm-in { min-height: 90px; resize: vertical; }
   <div class="el-bar">
     <input class="adm-in" id="q" placeholder="Search message, user, screen or browser" aria-label="Search errors" />
     <div class="adm-row">
-      <select class="adm-in" id="kind" aria-label="Kind"><option value="">All system errors</option><option value="crash">JavaScript crash</option><option value="firebase">Firebase / database</option><option value="storage">File storage</option><option value="api">API failure</option><option value="network">Network failure</option><option value="auth">Authentication</option><option value="feature">Feature failure</option><option value="resource">Page resource</option><option value="handled">Handled system error</option><option value="database">Database</option></select>
+      <select class="adm-in" id="kind" aria-label="Kind"><option value="">All system errors</option><option value="__test__">Automatic test events</option><option value="crash">JavaScript crash</option><option value="firebase">Firebase / database</option><option value="storage">File storage</option><option value="api">API failure</option><option value="network">Network failure</option><option value="auth">Authentication</option><option value="feature">Feature failure</option><option value="resource">Page resource</option><option value="handled">Handled system error</option><option value="database">Database</option></select>
       <label class="el-check"><input type="checkbox" id="group" checked /> Group repeats</label>
     </div>
     <div class="adm-row">
+      <a class="adm-btn blue el-test-link" href="https://murmurrr.vercel.app/?murmur-error-test=1" target="_blank" rel="noopener noreferrer">Run automatic test</a>
       <button type="button" class="adm-btn" id="refresh">Refresh</button>
       <button type="button" class="adm-btn blue" id="dl">Download .txt</button>
       <button type="button" class="adm-btn red" id="clear">Clear all</button>
@@ -223,10 +225,11 @@ function updateRefreshStatus() {
   if (b) { b.disabled = loading || left > 0; b.textContent = loading ? 'Refreshing…' : left > 0 ? 'Refresh in ' + fmtWait(left) : 'Refresh'; }
   if ($('refreshStatus')) $('refreshStatus').textContent = left > 0 ? 'Next refresh in ' + fmtWait(left) + '. This page enforces a 5-minute cooldown in this browser only; it is not server-side rate limiting.' : 'Refresh is available.';
 }
+function isTestEvent(e) { return String(e.message || '').indexOf('MURMUR_AUTOMATIC_ERROR_TEST:') === 0; }
 function rows() {
   var q = $('q').value.trim().toLowerCase(), kind = $('kind').value;
   return Object.keys(errors).map(function (id) { var e = Object.assign({}, errors[id] || {}); e.id = id; return e; })
-    .filter(function (e) { return (!kind || e.kind === kind) && (!q || (String(e.message || '') + ' ' + (e.note || '') + ' ' + (e.screen || '') + ' ' + (e.page || '') + ' ' + (e.ua || '') + ' ' + who(e.uid)).toLowerCase().indexOf(q) >= 0); })
+    .filter(function (e) { return (!kind || (kind === '__test__' ? isTestEvent(e) : e.kind === kind)) && (!q || (String(e.message || '') + ' ' + (e.note || '') + ' ' + (e.screen || '') + ' ' + (e.page || '') + ' ' + (e.ua || '') + ' ' + who(e.uid)).toLowerCase().indexOf(q) >= 0); })
     .sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
 }
 function render() {
@@ -238,7 +241,7 @@ function render() {
   $('count').textContent = list.length + ' error' + (list.length === 1 ? '' : 's') + (out.length !== list.length ? ' · ' + out.length + ' different' : '');
   $('list').innerHTML = out.slice(0, 150).map(function (x) {
     var e = x.e;
-    return '<div class="adm-card"><div class="adm-row"><span class="adm-tag red">' + esc(e.kind || 'unknown') + '</span><b class="adm-grow">' + esc(e.message || '(no message)') + '</b>' + (x.ids.length > 1 ? '<span class="adm-tag">x' + x.ids.length + '</span>' : '') + '</div>'
+    return '<div class="adm-card"><div class="adm-row">' + (isTestEvent(e) ? '<span class="adm-tag">TEST EVENT</span>' : '') + '<span class="adm-tag red">' + esc(e.kind || 'unknown') + '</span><b class="adm-grow">' + esc(e.message || '(no message)') + '</b>' + (x.ids.length > 1 ? '<span class="adm-tag">x' + x.ids.length + '</span>' : '') + '</div>'
       + '<small>' + esc(who(e.uid)) + ' · ' + esc(e.screen || '') + ' · ' + esc(ago(e.createdAt)) + ' · ' + esc(when(e.createdAt)) + '</small>'
       + '<small>' + esc((e.ua || '').slice(0, 90)) + '</small>' + (e.note ? '<small>' + esc(e.note) + '</small>' : '') + (e.page ? '<small>Source: ' + esc(e.page) + (e.line ? ':' + esc(e.line) + (e.column ? ':' + esc(e.column) : '') : '') + '</small>' : '')
       + (e.stack ? '<pre class="adm-pre">' + esc(e.stack) + '</pre>' : '')
