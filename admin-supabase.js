@@ -64,19 +64,19 @@
       <div class="sa-wrap">
         <header class="sa-head">
           <div class="sa-brand-wrap">
-            <div class="sa-brand-mark" aria-hidden="true">m</div>
+            <span class="sa-brand-mark" aria-hidden="true"><svg viewBox="0 0 64 64"><path fill="currentColor" d="M16 4h32a12 12 0 0 1 12 12v24a12 12 0 0 1-12 12H31L15 62V52a12 12 0 0 1-11-12V16A12 12 0 0 1 16 4z"/><g fill="#fff"><rect x="15" y="23" width="5" height="10" rx="2.5"/><rect x="24" y="16" width="5" height="24" rx="2.5"/><rect x="33" y="20" width="5" height="16" rx="2.5"/><rect x="42" y="24" width="5" height="8" rx="2.5"/></g></svg></span>
             <div><div class="sa-brand">murmur<span> / admin</span></div><div class="sa-muted" id="saIdentity">Secure administration workspace</div></div>
           </div>
           <div class="sa-actions"><span class="sa-role">SUPER ADMIN</span><button class="sa-btn" id="saTheme" type="button" aria-label="Toggle theme">Theme</button><button class="sa-btn" id="saRefresh" type="button">Refresh data</button><button class="sa-btn" id="saSignOut" type="button">Sign out</button></div>
         </header>
         <nav class="sa-tabs" aria-label="Admin sections">
-          <button class="sa-tab" data-tab="overview" type="button"><span class="sa-tab-icon">▦</span>Overview</button>
-          <button class="sa-tab" data-tab="users" type="button"><span class="sa-tab-icon">○</span>Users</button>
-          <button class="sa-tab" data-tab="reports" type="button"><span class="sa-tab-icon">⌕</span>Reports</button>
-          <button class="sa-tab" data-tab="posts" type="button"><span class="sa-tab-icon">▤</span>Posts</button>
-          <button class="sa-tab" data-tab="appeals" type="button"><span class="sa-tab-icon">◇</span>Appeals</button>
-          <button class="sa-tab" data-tab="announcements" type="button"><span class="sa-tab-icon">◉</span>Announcements</button>
-          <button class="sa-tab" data-tab="activity" type="button"><span class="sa-tab-icon">◷</span>Activity</button>
+          <button class="sa-tab" data-tab="overview" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="5" rx="2"/><rect x="13" y="10" width="8" height="11" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/></svg></span>Overview</button>
+          <button class="sa-tab" data-tab="users" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17" cy="9" r="2.6"/><path d="M17 14c2.8 0 4.7 1.8 4.7 4.5"/></svg></span>Users</button>
+          <button class="sa-tab" data-tab="reports" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></span>Reports</button>
+          <button class="sa-tab" data-tab="posts" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span>Posts</button>
+          <button class="sa-tab" data-tab="appeals" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><path d="m12 3 8 9-8 9-8-9z"/><path d="M12 8v5m0 3h.01"/></svg></span>Appeals</button>
+          <button class="sa-tab" data-tab="announcements" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><path d="m3 11 18-5v12L3 13z"/><path d="m7 14 2 7h5l-3-6"/></svg></span>Announcements</button>
+          <button class="sa-tab" data-tab="activity" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>Activity</button>
         </nav>
         <div id="saNotice" class="sa-message" hidden role="status"></div>
         <section id="saContent" aria-live="polite"><div class="sa-empty">Loading secure dashboard…</div></section>
