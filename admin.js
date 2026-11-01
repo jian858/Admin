@@ -58,8 +58,8 @@ function getToken() { return !AUTH.token ? Promise.resolve('') : (Date.now() < A
   const esc = t => String(t == null ? '' : t).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
   const ago = t => { if (!t) return ''; const m = Math.round((Date.now() - t) / 6e4); return m < 1 ? 'now' : m < 60 ? m + 'm' : m < 1440 ? Math.round(m / 60) + 'h' : Math.round(m / 1440) + 'd'; };
   const KEYS = { users: 'users', posts: 'posts', reports: 'reports', ann: 'announcements', reels: 'reels', appeals: 'appeals', deleted: 'deletedAccounts', log: 'auditLog', status: 'adminStatus', susp: 'suspended', stories: 'stories', notes: 'notes' };
-  const ICONS = { overview: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>', reports: '<path d="M5 21V4M5 4h12l-2 4 2 4H5"/>', users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17" cy="9" r="2.6"/><path d="M17 14c2.8 0 4.7 1.8 4.7 4.5"/>', posts: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/>', ann: '<path d="M4 10v4h3l8 4V6L7 10z"/><path d="M18 9a4 4 0 0 1 0 6"/>', appeals: '<path d="M4 5h16v11H9l-5 4z"/>', deleted: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>', log: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', reels: '<rect x="3" y="4" width="18" height="16" rx="4"/><path d="M10 9l5 3-5 3z"/>' };
-  const TABS = [['overview', 'Overview'], ['reports', 'Reports'], ['users', 'Users'], ['appeals', 'Appeals'], ['deleted', 'Deleted'], ['posts', 'Posts'], ['reels', 'Reels'], ['log', 'Activity'], ['ann', 'Announce']];
+  const ICONS = { overview: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>', reports: '<path d="M5 21V4M5 4h12l-2 4 2 4H5"/>', users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17" cy="9" r="2.6"/><path d="M17 14c2.8 0 4.7 1.8 4.7 4.5"/>', posts: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/>', ann: '<path d="M4 10v4h3l8 4V6L7 10z"/><path d="M18 9a4 4 0 0 1 0 6"/>', appeals: '<path d="M4 5h16v11H9l-5 4z"/>', deleted: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>', log: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', reels: '<rect x="3" y="4" width="18" height="16" rx="4"/><path d="M10 9l5 3-5 3z"/>', support: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 9h8M8 12h5"/>' };
+  const TABS = [['overview', 'Overview'], ['support', 'Customer Service'], ['reports', 'Reports'], ['users', 'Users'], ['appeals', 'Appeals'], ['deleted', 'Deleted'], ['posts', 'Posts'], ['reels', 'Reels'], ['log', 'Activity'], ['ann', 'Announce']];
   let D = {}, loadedData = new Set(), subs = [], el = null, scheduledDeleteTimer = null, tab = 'overview', q = '', armed = '', armT = null, suspUid = '', suspWhy = '', suspMode = 'susp', suspReasonCode = '', suspUntil = '', replyDraft = {}, msg = '';
   const ACCOUNT_REASONS = window.MURMUR_ACCOUNT_REASONS;
   const reasonLabel = window.MurmurRestrictionTools.reasonLabel;
@@ -133,7 +133,7 @@ function getToken() { return !AUTH.token ? Promise.resolve('') : (Date.now() < A
     await set(ref(db, 'appeals/' + uid), Object.assign({}, a, { status: ok ? 'approved' : 'declined', reply, decidedAt: serverTimestamp() }));
     delete replyDraft[uid]; await logAct(ok ? 'appeal-approved' : 'appeal-declined', uid, reply);
   }
-  const tabBadge = t => t === 'reports' ? count('reports') : t === 'appeals' ? entries('appeals').filter(([, a]) => a.status === 'open').length : 0;
+  const tabBadge = t => t === 'reports' ? entries('reports').filter(([, r]) => r.type !== 'support').length : t === 'support' ? entries('reports').filter(([, r]) => r.type === 'support' && (r.status || 'open') !== 'resolved').length : t === 'appeals' ? entries('appeals').filter(([, a]) => a.status === 'open').length : 0;
 
   function view() {
     if (tab === 'overview') {
@@ -145,8 +145,28 @@ function getToken() { return !AUTH.token ? Promise.resolve('') : (Date.now() < A
         : `<div class="adm-card"><b>Admin account IDs</b><small class="adm-muted">${esc(ids.idsError || ids.error || (ids.status === 'missing-firebase-role-claim' ? 'Firebase role=authenticated claim is missing.' : 'Connecting Firebase and Supabase…'))}</small></div>`;
       return `<div class="adm-card"><div class="adm-row"><b class="adm-grow">Admin status</b><span class="adm-tag${on ? '' : ' red'}">${on ? 'Online' : 'Offline'}</span></div><small>${on ? 'Saved: you are online as admin.' : 'Last seen ' + (D.status && D.status.lastSeen ? ago(D.status.lastSeen) + ' ago' : 'never')}</small></div>${identityCard}<div class="adm-stats">${[['Users', count('users')], ['Posts', count('posts')], ['Open reports', open], ['Suspended', count('susp')], ['Stories live', stories], ['Notes', count('notes')], ['Open appeals', tabBadge('appeals')], ['Deleted accounts', entries('deleted').filter(([, d]) => d.status === 'deleted').length]].map(s => `<div class="adm-stat"><b>${s[1]}</b><span class="adm-muted">${s[0]}</span></div>`).join('')}</div>`;
     }
+    if (tab === 'support') {
+      const list = entries('reports').filter(([, r]) => r.type === 'support').sort((a, b) => (b[1].createdAt || 0) - (a[1].createdAt || 0));
+      return list.length ? list.map(([id, r]) => {
+        const status = r.status || 'open';
+        const statusLabel = status === 'resolved' ? 'Resolved' : status === 'in_progress' ? 'In progress' : 'Open';
+        const sender = r.byName || nm(r.by);
+        return `<div class="adm-card">
+          <div class="adm-row"><span class="adm-tag${status === 'resolved' ? '' : ' red'}">${statusLabel}</span><b class="adm-grow">${esc(r.category || 'Customer support')}</b><small>${ago(r.createdAt)}</small></div>
+          <p><b>${esc(r.reason || 'Customer support request')}</b></p>
+          <p class="adm-support-details">${esc(r.details || 'No details provided').replace(/\\n/g, '<br>')}</p>
+          <small>From ${esc(sender)} · User ID: ${esc(r.by || 'Unavailable')}</small>
+          <div class="adm-row">
+            ${status !== 'in_progress' ? `<button type="button" class="adm-btn" data-act="supportstatus" data-id="${esc(id)}" data-status="in_progress">Mark in progress</button>` : ''}
+            ${status !== 'resolved' ? `<button type="button" class="adm-btn" data-act="supportstatus" data-id="${esc(id)}" data-status="resolved">Resolve</button>` : ''}
+            ${status !== 'open' ? `<button type="button" class="adm-btn" data-act="supportstatus" data-id="${esc(id)}" data-status="open">Reopen</button>` : ''}
+            ${btn('red', 'dismiss', id, 'Delete request')}
+          </div>
+        </div>`;
+      }).join('') : '<p class="adm-muted">No customer support requests yet.</p>';
+    }
     if (tab === 'reports') {
-      const list = entries('reports').sort((a, b) => (b[1].createdAt || 0) - (a[1].createdAt || 0));
+      const list = entries('reports').filter(([, r]) => r.type !== 'support').sort((a, b) => (b[1].createdAt || 0) - (a[1].createdAt || 0));
       return list.length ? list.map(([id, r]) => {
         const isPost = r.type === 'post', post = isPost ? (D.posts || {})[r.targetId] : null, uid = isPost ? (post && post.authorUid) : r.targetId;
         return `<div class="adm-card"><div class="adm-row"><span class="adm-tag red">${esc(r.type || 'report')}</span><b class="adm-grow">${esc(r.reason || 'No reason')}</b><small>${ago(r.createdAt)}</small></div>
@@ -247,6 +267,13 @@ function getToken() { return !AUTH.token ? Promise.resolve('') : (Date.now() < A
         run(() => push(ref(db, 'announcements'), { title: d.title.trim().slice(0, 60), body: d.body.trim().slice(0, 240), kind: d.kind, pinned: d.pin, createdAt: serverTimestamp(), ...(hrs ? { expiresAt: Date.now() + hrs * 36e5 } : {}) }), 'Announcement published.'); return;
       }
       if (a === 'unsusp') { run(async () => { await remove(ref(db, 'suspended/' + id)); await logAct('unsuspend', id, ''); }, nm(id) + ' can use Murmur again.'); return; }
+      if (a === 'supportstatus') {
+        const item = (D.reports || {})[id];
+        const nextStatus = b.dataset.status;
+        if (!item || item.type !== 'support' || !['open', 'in_progress', 'resolved'].includes(nextStatus)) { msg = 'This support request could not be updated.'; render(); return; }
+        run(() => set(ref(db, 'reports/' + id), { ...item, status: nextStatus, updatedAt: serverTimestamp() }), nextStatus === 'resolved' ? 'Support request marked resolved.' : nextStatus === 'in_progress' ? 'Support request marked in progress.' : 'Support request reopened.');
+        return;
+      }
       if (!arm(a + id)) return;
       if (a === 'delpost') run(() => delPost(id), 'Post deleted.');
       else if (a === 'dismiss') run(() => remove(ref(db, 'reports/' + id)), 'Report dismissed.');
