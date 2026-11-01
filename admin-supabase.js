@@ -25,25 +25,6 @@
   let activeTab = "overview";
   let busy = false;
 
-  const style = document.createElement("style");
-  style.textContent = `
-    .sa-shell{min-height:100vh;background:var(--bg,#f5f6f8);color:var(--text,#17202b);padding:24px;box-sizing:border-box;font:inherit}
-    .sa-wrap{max-width:1180px;margin:auto}.sa-head{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:22px}
-    .sa-brand{font-size:24px;font-weight:800;letter-spacing:-.04em}.sa-muted{color:var(--muted,#687386);font-size:13px}
-    .sa-actions,.sa-tabs{display:flex;gap:8px;flex-wrap:wrap}.sa-btn{border:1px solid var(--line,#dce1e8);background:var(--surface,#fff);color:inherit;border-radius:10px;padding:10px 14px;font:inherit;font-size:13px;font-weight:650;cursor:pointer}
-    .sa-btn.primary{background:#202b3b;color:white;border-color:#202b3b}.sa-btn.danger{color:#b42318}.sa-btn:disabled{opacity:.5;cursor:wait}
-    .sa-tabs{margin:18px 0}.sa-tabs button[aria-current=true]{background:#202b3b;color:#fff;border-color:#202b3b}
-    .sa-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}.sa-card,.sa-panel{background:var(--surface,#fff);border:1px solid var(--line,#e1e5eb);border-radius:15px;padding:17px;box-shadow:0 3px 14px #15223808}
-    .sa-number{font-size:28px;font-weight:800;margin-top:8px}.sa-panel{margin-top:14px;overflow:hidden}.sa-panel h2{font-size:17px;margin:0 0 14px}
-    .sa-table-wrap{overflow:auto} .sa-table{width:100%;border-collapse:collapse;font-size:13px}.sa-table th,.sa-table td{text-align:left;padding:12px 10px;border-top:1px solid var(--line,#e6e9ee);vertical-align:top}
-    .sa-table th{color:var(--muted,#687386);font-size:11px;text-transform:uppercase;letter-spacing:.06em}.sa-status{display:inline-block;border-radius:99px;padding:4px 8px;background:#edf1f5;font-size:11px}
-    .sa-toolbar{display:flex;gap:10px;align-items:center;justify-content:space-between;margin-bottom:12px}.sa-search{max-width:320px;width:100%;padding:10px 12px;border:1px solid var(--line,#dce1e8);border-radius:10px;background:var(--surface,#fff);color:inherit;font:inherit}
-    .sa-message{padding:12px 14px;border-radius:10px;background:#f1f4f8;margin:12px 0;font-size:13px}.sa-empty{padding:28px;text-align:center;color:var(--muted,#687386)}
-    .sa-cell-actions{display:flex;gap:6px;flex-wrap:wrap}.sa-small{font-size:11px;padding:7px 9px}
-    @media(max-width:600px){.sa-shell{padding:14px}.sa-head{align-items:flex-start;flex-direction:column}.sa-table{min-width:680px}}
-  `;
-  document.head.appendChild(style);
-
   function setError(message) {
     errorBox.textContent = message || "";
     errorBox.hidden = !message;
@@ -82,17 +63,20 @@
     root.innerHTML = `
       <div class="sa-wrap">
         <header class="sa-head">
-          <div><div class="sa-brand">murmur / admin</div><div class="sa-muted" id="saIdentity">Secure Supabase administration</div></div>
-          <div class="sa-actions"><button class="sa-btn" id="saRefresh" type="button">Refresh data</button><button class="sa-btn" id="saSignOut" type="button">Sign out</button></div>
+          <div class="sa-brand-wrap">
+            <div class="sa-brand-mark" aria-hidden="true">m</div>
+            <div><div class="sa-brand">murmur<span> / admin</span></div><div class="sa-muted" id="saIdentity">Secure administration workspace</div></div>
+          </div>
+          <div class="sa-actions"><span class="sa-role">SUPER ADMIN</span><button class="sa-btn" id="saTheme" type="button" aria-label="Toggle theme">Theme</button><button class="sa-btn" id="saRefresh" type="button">Refresh data</button><button class="sa-btn" id="saSignOut" type="button">Sign out</button></div>
         </header>
         <nav class="sa-tabs" aria-label="Admin sections">
-          <button class="sa-btn" data-tab="overview" type="button">Overview</button>
-          <button class="sa-btn" data-tab="users" type="button">Users</button>
-          <button class="sa-btn" data-tab="reports" type="button">Reports</button>
-          <button class="sa-btn" data-tab="posts" type="button">Posts</button>
-          <button class="sa-btn" data-tab="appeals" type="button">Appeals</button>
-          <button class="sa-btn" data-tab="announcements" type="button">Announcements</button>
-          <button class="sa-btn" data-tab="activity" type="button">Activity</button>
+          <button class="sa-tab" data-tab="overview" type="button"><span class="sa-tab-icon">▦</span>Overview</button>
+          <button class="sa-tab" data-tab="users" type="button"><span class="sa-tab-icon">○</span>Users</button>
+          <button class="sa-tab" data-tab="reports" type="button"><span class="sa-tab-icon">⌕</span>Reports</button>
+          <button class="sa-tab" data-tab="posts" type="button"><span class="sa-tab-icon">▤</span>Posts</button>
+          <button class="sa-tab" data-tab="appeals" type="button"><span class="sa-tab-icon">◇</span>Appeals</button>
+          <button class="sa-tab" data-tab="announcements" type="button"><span class="sa-tab-icon">◉</span>Announcements</button>
+          <button class="sa-tab" data-tab="activity" type="button"><span class="sa-tab-icon">◷</span>Activity</button>
         </nav>
         <div id="saNotice" class="sa-message" hidden role="status"></div>
         <section id="saContent" aria-live="polite"><div class="sa-empty">Loading secure dashboard…</div></section>
@@ -103,7 +87,14 @@
     }));
     root.querySelector("#saRefresh").addEventListener("click", refreshManually);
     root.querySelector("#saSignOut").addEventListener("click", signOut);
+    root.querySelector("#saTheme").addEventListener("click", toggleTheme);
     loadTab();
+  }
+
+  function toggleTheme() {
+    const next = document.documentElement.dataset.theme === "dark" ? "light" : "dark";
+    document.documentElement.dataset.theme = next;
+    try { localStorage.setItem("murmur-theme", next); } catch (_) {}
   }
 
   function notice(message) {
@@ -115,7 +106,9 @@
 
   function updateTabs() {
     document.querySelectorAll("[data-tab]").forEach((button) => {
-      button.setAttribute("aria-current", String(button.dataset.tab === activeTab));
+      const active = button.dataset.tab === activeTab;
+      button.setAttribute("aria-current", String(active));
+      button.classList.toggle("is-active", active);
     });
   }
 
