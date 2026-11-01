@@ -59,6 +59,7 @@ html[data-theme="dark"] .adm { background: var(--bg); }
 .adm-card { padding: 12px 16px; display: flex; flex-direction: column; gap: 8px; }
 .adm-card p { margin: 0; overflow-wrap: anywhere; }
 .adm-card small, .adm-muted { color: var(--muted); }
+.adm-id { overflow-wrap: anywhere; user-select: text; }
 .adm-row { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .adm-row > .adm-grow { flex: 1; min-width: 0; }
 .adm-stats { display: grid; grid-template-columns: repeat(2, 1fr); gap: 8px; }
@@ -235,10 +236,13 @@ function getToken() { return !AUTH.token ? Promise.resolve('') : (Date.now() < A
     }
     if (tab === 'users') {
       const s = q.trim().toLowerCase();
-      const list = entries('users').filter(([, u]) => !s || ((u.name || '') + ' ' + (u.username || '') + ' ' + (u.code || '') + ' ' + fmt(u.code)).toLowerCase().includes(s)).sort((a, b) => (a[1].name || '').localeCompare(b[1].name || ''));
+      const accountIds = window.MURMUR_ADMIN_IDS && window.MURMUR_ADMIN_IDS.accountIds || {};
+      const list = entries('users').filter(([uid, u]) => !s || ((uid || '') + ' ' + (accountIds[uid] || '') + ' ' + (u.name || '') + ' ' + (u.username || '') + ' ' + (u.code || '') + ' ' + fmt(u.code)).toLowerCase().includes(s)).sort((a, b) => (a[1].name || '').localeCompare(b[1].name || ''));
       return missingIdsCard() + `<input class="adm-in" data-q placeholder="Search name, @username or 16-character ID" value="${esc(q)}" />` + (list.map(([uid, u]) => {
         const sus = (D.susp || {})[uid], st = (D.stories || {})[uid], dl = (D.deleted || {})[uid], isDel = dl && dl.status === 'deleted';
+        const supabaseId = accountIds[uid] || '';
         return `<div class="adm-card"><div class="adm-row"><div class="adm-grow"><b>${esc(u.name || 'Unknown')}</b><br /><small>${esc(u.username || '')}${u.code ? ' · ID ' + fmt(u.code) : ''}</small></div>${isDel ? '<span class="adm-tag red">Deleted</span>' : sus ? '<span class="adm-tag red">Suspended</span>' : ''}</div>
+          <small class="adm-id">Firebase UID: ${esc(uid)}</small><small class="adm-id">Supabase UUID: ${supabaseId ? esc(supabaseId) : 'Not linked yet'}</small>
           ${(D.notes || {})[uid] ? `<p><small>Note:</small> ${esc(D.notes[uid].text)}</p>` : ''}
           <div class="adm-row">${isDel ? btn('blue', 'recover', uid, 'Recover account') : (sus ? btn('blue', 'unsusp', uid, 'Unsuspend') : `<button type="button" class="adm-btn" data-act="asksusp" data-id="${esc(uid)}">Suspend</button>`) + `<button type="button" class="adm-btn red" data-act="askdel" data-id="${esc(uid)}">Delete account</button>`}${(D.notes || {})[uid] ? btn('', 'delnote', uid, 'Remove note') : ''}${st && Object.keys(st).length ? btn('', 'delstories', uid, 'Clear stories') : ''}</div>${suspUid === uid ? suspForm() : ''}</div>`;
       }).join('') || '<p class="adm-muted">No users found.</p>');
@@ -336,6 +340,7 @@ function getToken() { return !AUTH.token ? Promise.resolve('') : (Date.now() < A
   }
 
   window.openMurmurAdmin = openAdmin;
+  window.refreshMurmurAdminIds = function () { if (el) render(); };
 })();
 
 var gate = document.getElementById('gate'), msg = document.getElementById('err'), go = document.getElementById('go');
@@ -350,7 +355,7 @@ function goOffline() { clearInterval(beat); saveStatus(false); }
 document.addEventListener('visibilitychange', function () { if (!document.getElementById('adminOut')) return; if (document.hidden) goOffline(); else goOnline(); });
 window.addEventListener('pagehide', function () { if (document.getElementById('adminOut')) goOffline(); });
 async function syncAdminSupabaseIdentity() {
-  window.MURMUR_ADMIN_IDS = { firebaseUid: null, supabaseId: null, status: 'checking' };
+  window.MURMUR_ADMIN_IDS = { firebaseUid: null, supabaseId: null, status: 'checking', accountIds: {}, idsStatus: 'checking' };
   try {
     // Refresh the Firebase REST token to pick up server-assigned custom claims.
     var token = await refreshToken();
@@ -371,7 +376,16 @@ async function syncAdminSupabaseIdentity() {
     var result = await window.murmurAdminSupabase.rpc('ensure_murmur_user');
     if (result.error) throw result.error;
     if (!result.data) throw new Error('ensure_murmur_user returned no Supabase UUID');
-    window.MURMUR_ADMIN_IDS = { firebaseUid: payload.sub, supabaseId: result.data, status: 'connected' };
+    window.MURMUR_ADMIN_IDS = { firebaseUid: payload.sub, supabaseId: result.data, status: 'connected', accountIds: {}, idsStatus: 'loading' };
+    var idsResult = await window.murmurAdminSupabase.rpc('admin_list_murmur_user_ids');
+    if (idsResult.error) {
+      window.MURMUR_ADMIN_IDS.idsStatus = 'error';
+      window.MURMUR_ADMIN_IDS.idsError = String(idsResult.error.message || idsResult.error);
+    } else {
+      (idsResult.data || []).forEach(function (row) { window.MURMUR_ADMIN_IDS.accountIds[row.firebase_uid] = row.supabase_id; });
+      window.MURMUR_ADMIN_IDS.idsStatus = 'loaded';
+    }
+    if (window.refreshMurmurAdminIds) window.refreshMurmurAdminIds();
     console.info('Murmur admin Firebase/Supabase identity linked', window.MURMUR_ADMIN_IDS);
   } catch (error) {
     window.MURMUR_ADMIN_IDS.status = 'sync-error';
