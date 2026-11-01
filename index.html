@@ -164,7 +164,7 @@ function getToken() { return !AUTH.token ? Promise.resolve('') : (Date.now() < A
   const KEYS = { users: 'users', posts: 'posts', reports: 'reports', ann: 'announcements', reels: 'reels', appeals: 'appeals', deleted: 'deletedAccounts', log: 'auditLog', status: 'adminStatus', susp: 'suspended', stories: 'stories', notes: 'notes' };
   const ICONS = { overview: '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>', reports: '<path d="M5 21V4M5 4h12l-2 4 2 4H5"/>', users: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17" cy="9" r="2.6"/><path d="M17 14c2.8 0 4.7 1.8 4.7 4.5"/>', posts: '<rect x="4" y="4" width="16" height="16" rx="2"/><path d="M8 9h8M8 13h8M8 17h5"/>', ann: '<path d="M4 10v4h3l8 4V6L7 10z"/><path d="M18 9a4 4 0 0 1 0 6"/>', appeals: '<path d="M4 5h16v11H9l-5 4z"/>', deleted: '<path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13"/>', log: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>', reels: '<rect x="3" y="4" width="18" height="16" rx="4"/><path d="M10 9l5 3-5 3z"/>' };
   const TABS = [['overview', 'Overview'], ['reports', 'Reports'], ['users', 'Users'], ['appeals', 'Appeals'], ['deleted', 'Deleted'], ['posts', 'Posts'], ['reels', 'Reels'], ['log', 'Activity'], ['ann', 'Announce']];
-  let D = {}, loadedData = new Set(), subs = [], el = null, tab = 'overview', q = '', armed = '', armT = null, suspUid = '', suspWhy = '', suspMode = 'susp', suspReasonCode = '', suspUntil = '', replyDraft = {}, msg = '';
+  let D = {}, loadedData = new Set(), subs = [], el = null, scheduledDeleteTimer = null, tab = 'overview', q = '', armed = '', armT = null, suspUid = '', suspWhy = '', suspMode = 'susp', suspReasonCode = '', suspUntil = '', replyDraft = {}, msg = '';
   const ACCOUNT_REASONS = [{id:'spam',icon:'📨',label:'Spam or repeated unwanted activity'},{id:'harassment',icon:'🛑',label:'Harassment or bullying'},{id:'hate',icon:'🚫',label:'Hateful or abusive content'},{id:'impersonation',icon:'🎭',label:'Impersonation or fake identity'},{id:'scam',icon:'⚠️',label:'Scams, fraud, or deception'},{id:'unsafe',icon:'🧨',label:'Threats or dangerous content'},{id:'privacy',icon:'🔒',label:'Sharing private information'},{id:'sexual',icon:'🔞',label:'Sexual or inappropriate content'},{id:'copyright',icon:'©️',label:'Copyright or intellectual-property violation'},{id:'other',icon:'📝',label:'Other policy violation'}];
   const reasonLabel = id => (ACCOUNT_REASONS.find(x => x.id === id) || ACCOUNT_REASONS[9]).label;
   let draft = { title: '', body: '', kind: 'info', pin: false, hrs: '0' };
@@ -213,7 +213,7 @@ function getToken() { return !AUTH.token ? Promise.resolve('') : (Date.now() < A
         const u = (D.users || {})[uid] || {}, profile = await read('profiles/' + uid).catch(() => null), posts = {};
         entries('posts').forEach(([id, p]) => { if (p.authorUid === uid) posts[id] = p; });
         await set(ref(db, 'deletedAccounts/' + uid), { ...item, name: item.name || u.name || nm(uid), username: item.username || u.username || '', status: 'deleted', deletedAt: serverTimestamp(), profile: profile || null, posts });
-        await set(ref(db, 'suspended/' + uid), { reason: item.reason, reasonCode: item.reasonCode, deleted: true, createdAt: serverTimestamp() });
+        await set(ref(db, 'suspended/' + uid), { reason: item.reason, reasonCode: item.reasonCode, deleted: true, deleteAt: item.scheduledFor, createdAt: serverTimestamp() });
         await Promise.all([remove(ref(db, 'profiles/' + uid)), remove(ref(db, 'stories/' + uid)), remove(ref(db, 'notes/' + uid))].concat(Object.keys(posts).map(delPost)));
         await logAct('delete', uid, item.reason || 'Scheduled deletion');
       } catch (error) {
@@ -322,14 +322,14 @@ function getToken() { return !AUTH.token ? Promise.resolve('') : (Date.now() < A
     if (el) return;
     el = document.createElement('div'); el.className = 'adm'; el.setAttribute('role', 'dialog'); el.setAttribute('aria-label', 'Admin panel');
     el.innerHTML = '<div class="adm-top"><button type="button" data-act="close" aria-label="Close" hidden></button><span class="adm-logo">murmur</span><span class="adm-badge">Admin</span></div><div class="adm-tabs"></div><div class="adm-body"></div>';
-    document.body.appendChild(el); tab = 'overview'; msg = ''; D = {}; loadedData = new Set();
+    document.body.appendChild(el); tab = 'overview'; msg = ''; D = {}; loadedData = new Set(); clearInterval(scheduledDeleteTimer); scheduledDeleteTimer = setInterval(() => { if (loadedData.has('deleted') && loadedData.has('users') && loadedData.has('posts')) processScheduledDeletions(); }, 5000);
     Object.entries(KEYS).forEach(([k, p]) => subs.push(onValue(ref(db, p), s => { D[k] = s.val() || {}; loadedData.add(k); render(); if (loadedData.has('deleted') && loadedData.has('users') && loadedData.has('posts')) processScheduledDeletions(); }, () => {})));
     render();
     el.addEventListener('click', e => {
       const t = e.target.closest('[data-tab]'); if (t) { tab = t.dataset.tab; msg = ''; el.dataset.anim = '1'; clearTimeout(openAdmin.t); openAdmin.t = setTimeout(() => { if (el) delete el.dataset.anim; }, 700); render(); return; }
       const b = e.target.closest('[data-act],[data-reason]'); if (!b) return;
       const a = b.dataset.act, id = b.dataset.id;
-      if (a === 'close') { subs.forEach(u => u()); subs = []; el.remove(); el = null; return; }
+      if (a === 'close') { subs.forEach(u => u()); subs = []; clearInterval(scheduledDeleteTimer); scheduledDeleteTimer = null; el.remove(); el = null; return; }
       if (a === 'asksusp') { suspUid = id; suspWhy = ''; suspReasonCode = ''; suspUntil = ''; suspMode = 'susp'; render(); return; }
       if (a === 'mkcodes') { run(async () => { await createMissingIds(); }, 'IDs created for the users who had none.'); return; }
       if (a === 'askdel') { suspUid = id; suspWhy = ''; suspReasonCode = ''; suspUntil = ''; suspMode = 'del'; render(); return; }
