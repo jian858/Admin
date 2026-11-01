@@ -4,7 +4,7 @@
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="robots" content="noindex" />
-<title>Murmur Error log</title>
+<title>Murmur Error and Bug Log</title>
 <!--
   RULES FOR CHANGING THIS CODE
   RULE 1: before you add a feature, clean up the code it touches.
@@ -99,7 +99,7 @@ textarea.adm-in { min-height: 90px; resize: vertical; }
 <div class="gate" id="gate">
   <form id="loginForm">
     <div class="logo">murmur</div>
-    <p class="sub">Error log</p>
+    <p class="sub">Error and bug log</p>
     <input id="email" type="email" placeholder="Admin email" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" required />
     <input id="pass" type="password" placeholder="Password" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" required />
     <label class="show"><input type="checkbox" id="showPass" /> Show password</label>
@@ -110,11 +110,11 @@ textarea.adm-in { min-height: 90px; resize: vertical; }
 
 <main id="app" hidden>
   <div class="el-sticky">
-  <header class="adm-top el-top"><span class="adm-logo">murmur</span><span class="adm-badge">Error log</span><button type="button" class="adm-btn" id="out">Sign out</button></header>
+  <header class="adm-top el-top"><span class="adm-logo">murmur</span><span class="adm-badge">Error and bug log</span><button type="button" class="adm-btn" id="out">Sign out</button></header>
   <div class="el-bar">
     <input class="adm-in" id="q" placeholder="Search message, user, screen or browser" aria-label="Search errors" />
     <div class="adm-row">
-      <select class="adm-in" id="kind" aria-label="Kind"><option value="">All kinds</option><option value="crash">Crash</option><option value="handled">Handled</option><option value="database">Database</option></select>
+      <select class="adm-in" id="kind" aria-label="Kind"><option value="">All kinds</option><option value="crash">Crash</option><option value="handled">Handled</option><option value="database">Database</option><option value="resource">Resource</option><option value="bug">Bug</option></select>
       <label class="el-check"><input type="checkbox" id="group" checked /> Group repeats</label>
     </div>
     <div class="adm-row">
@@ -160,16 +160,20 @@ function verifyAdmin(token) {
     return body;
   });
 }
-function db(method, path) {
-  return getToken().then(function (t) {
-    var safePath = path.split('/').map(encodeURIComponent).join('/');
-    return fetch(BASE + '/' + safePath + '.json?auth=' + encodeURIComponent(t), { method: method });
-  }).then(async function (r) {
-    var body = await r.json().catch(function () { return null; });
-    if (!r.ok) {
-      var detail = body && body.error && body.error.message;
-      throw new Error(r.status === 401 || r.status === 403 ? 'Database permission denied. Check Firebase Realtime Database rules.' : (detail || 'Database request failed (' + r.status + ').'));
-    }
+var ERROR_LOG_URL = 'https://pkadftvqslkykehcqedj.supabase.co/functions/v1/murmur-error-log';
+function logApi(method, query) {
+  return getToken().then(function (token) {
+    return fetch(ERROR_LOG_URL + (query || ''), {
+      method: method,
+      headers: {
+        'Authorization': 'Bearer ' + token,
+        'apikey': SUPABASE_PUBLIC_KEY,
+        'Content-Type': 'application/json'
+      }
+    });
+  }).then(async function (response) {
+    var body = await response.json().catch(function () { return {}; });
+    if (!response.ok) throw new Error(body.error || 'Error log request failed (' + response.status + ').');
     return body;
   });
 }
@@ -222,7 +226,7 @@ function updateRefreshStatus() {
 function rows() {
   var q = $('q').value.trim().toLowerCase(), kind = $('kind').value;
   return Object.keys(errors).map(function (id) { var e = Object.assign({}, errors[id] || {}); e.id = id; return e; })
-    .filter(function (e) { return (!kind || e.kind === kind) && (!q || (String(e.message || '') + ' ' + (e.note || '') + ' ' + (e.screen || '') + ' ' + (e.ua || '') + ' ' + who(e.uid)).toLowerCase().indexOf(q) >= 0); })
+    .filter(function (e) { return (!kind || e.kind === kind) && (!q || (String(e.message || '') + ' ' + (e.note || '') + ' ' + (e.screen || '') + ' ' + (e.page || '') + ' ' + (e.ua || '') + ' ' + who(e.uid)).toLowerCase().indexOf(q) >= 0); })
     .sort(function (a, b) { return (b.createdAt || 0) - (a.createdAt || 0); });
 }
 function render() {
@@ -236,7 +240,7 @@ function render() {
     var e = x.e;
     return '<div class="adm-card"><div class="adm-row"><span class="adm-tag red">' + esc(e.kind || 'unknown') + '</span><b class="adm-grow">' + esc(e.message || '(no message)') + '</b>' + (x.ids.length > 1 ? '<span class="adm-tag">x' + x.ids.length + '</span>' : '') + '</div>'
       + '<small>' + esc(who(e.uid)) + ' · ' + esc(e.screen || '') + ' · ' + esc(ago(e.createdAt)) + ' · ' + esc(when(e.createdAt)) + '</small>'
-      + '<small>' + esc((e.ua || '').slice(0, 90)) + '</small>' + (e.note ? '<small>' + esc(e.note) + '</small>' : '')
+      + '<small>' + esc((e.ua || '').slice(0, 90)) + '</small>' + (e.note ? '<small>' + esc(e.note) + '</small>' : '') + (e.page ? '<small>Source: ' + esc(e.page) + (e.line ? ':' + esc(e.line) + (e.column ? ':' + esc(e.column) : '') : '') + '</small>' : '')
       + (e.stack ? '<pre class="adm-pre">' + esc(e.stack) + '</pre>' : '')
       + '<div class="adm-row"><button type="button" class="adm-btn" data-del="' + x.ids.map(esc).join(',') + '">Delete' + (x.ids.length > 1 ? ' all ' + x.ids.length : '') + '</button></div></div>';
   }).join('') || '<p class="adm-muted">No errors found.</p>';
@@ -252,7 +256,23 @@ async function load(force) {
   if (!force && left > 0) { restoreCache(); updateRefreshStatus(); return; }
   loading = true; updateRefreshStatus(); $('count').textContent = 'Loading errors…';
   try {
-    errors = (await db('GET', 'errorLog')) || {};
+    var result = await logApi('GET', '?limit=500');
+    errors = {};
+    (result.items || []).forEach(function (item) {
+      errors[item.id] = {
+        uid: item.firebase_uid,
+        kind: item.kind,
+        message: item.message,
+        note: item.code ? 'Code: ' + item.code : '',
+        screen: item.page || '',
+        page: item.source || '',
+        line: item.line || '',
+        column: item.column_number || '',
+        ua: item.user_agent || '',
+        stack: item.stack || '',
+        createdAt: item.created_at ? new Date(item.created_at).getTime() : 0
+      };
+    });
     users = {};
     cacheErrors();
     try { localStorage.setItem(LAST_REFRESH_KEY, String(Date.now())); } catch (e) {}
@@ -281,7 +301,7 @@ function start() {
     if (typed !== 'DELETE ALL ERROR LOGS') return;
     if (!window.confirm('Final confirmation: permanently delete every error log? This cannot be undone.')) return;
     $('clear').disabled = true;
-    try { await db('DELETE', 'errorLog'); errors = {}; cacheErrors(); render(); $('count').textContent = 'All error logs were deleted.'; }
+    try { await logApi('DELETE', ''); errors = {}; cacheErrors(); render(); $('count').textContent = 'All error logs were deleted.'; }
     catch (e) { $('count').textContent = 'Could not clear errors: ' + String(e.message || e); }
     finally { $('clear').disabled = false; }
   };
@@ -293,7 +313,7 @@ function start() {
     var deleted = [];
     try {
       for (var i = 0; i < ids.length; i++) {
-        await db('DELETE', 'errorLog/' + ids[i]);
+        await logApi('DELETE', '?id=' + encodeURIComponent(ids[i]));
         deleted.push(ids[i]);
       }
       deleted.forEach(function (id) { delete errors[id]; });
