@@ -74,7 +74,6 @@ textarea.adm-in { min-height: 90px; resize: vertical; }
 .adm-tag.red { background: rgba(179,38,30,0.12); color: var(--danger); }
 .adm-pre { margin: 0; max-height: 120px; overflow: auto; padding: var(--sp-2); border-radius: 8px; background: var(--soft); font-size: 0.72rem; white-space: pre-wrap; overflow-wrap: anywhere; }
 .adm-msg { padding: 10px 14px; border-radius: 12px; background: rgba(20,200,160,0.12); color: var(--ink); font-size: 0.9rem; }
-.adm-top [data-act="close"] { display: none; }
 @media (prefers-reduced-motion: no-preference) {
   .adm { animation: admIn .3s ease-out both; }
   .adm[data-anim] .adm-card, .adm[data-anim] .adm-stat { animation: rowIn .34s cubic-bezier(.2,.8,.2,1) both; }
@@ -92,7 +91,6 @@ textarea.adm-in { min-height: 90px; resize: vertical; }
 .el-wrap { max-width: 760px; margin: 0 auto; padding: var(--sp-3) var(--sp-3) var(--sp-6); display: flex; flex-direction: column; gap: var(--sp-2); }
 .el-check { display: flex; align-items: center; gap: var(--sp-2); white-space: nowrap; }
 .el-count { color: var(--muted); font-size: 0.9rem; }
-.adm-pre { margin: 0; max-height: 140px; overflow: auto; padding: var(--sp-2); border-radius: 8px; background: var(--soft); font-size: 0.72rem; white-space: pre-wrap; overflow-wrap: anywhere; }
 </style>
 <script>try { var t = localStorage.getItem('murmur-theme'); document.documentElement.dataset.theme = (t === 'dark' || t === 'light') ? t : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); } catch (e) {}</script>
 </head>
@@ -131,48 +129,22 @@ textarea.adm-in { min-height: 90px; resize: vertical; }
   <div class="el-wrap" id="list"></div>
 </main>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="./error-reporter.js?v=1"></script>
 <script>
-/* ---------- real Firebase sign-in (same admin account as the admin page) ---------- */
-var API_KEY = 'AIzaSyBRjnlDgDmLRkVncPYx34eNdYMI48L7q1M', BASE = 'https://murmur-fc430-default-rtdb.firebaseio.com', IDT = 'https://identitytoolkit.googleapis.com/v1/accounts:', ADMIN_VERIFY_URL = 'https://pkadftvqslkykehcqedj.supabase.co/functions/v1/murmur-admin', SUPABASE_PUBLIC_KEY = 'sb_publishable_etoHiUGbJ96MUPzJABL12A_UiTWVxok';
-var AUTH = { token: '', refresh: '', exp: 0 };
-function authCall(url, body) {
-  return fetch(url + '?key=' + API_KEY, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-    .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error((j.error && j.error.message) || 'error'); return j; }); });
-}
-function adopt(j) {
-  AUTH.token = j.idToken || j.id_token; AUTH.refresh = j.refreshToken || j.refresh_token;
-  AUTH.exp = Date.now() + (Number(j.expiresIn || j.expires_in || 3600) - 120) * 1000;
-  try { localStorage.setItem('murmur-admin-rt', AUTH.refresh); } catch (e) {}
-}
-function refreshToken() {
-  return fetch('https://securetoken.googleapis.com/v1/token?key=' + API_KEY, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: 'grant_type=refresh_token&refresh_token=' + encodeURIComponent(AUTH.refresh) })
-    .then(function (r) { return r.json().then(function (j) { if (!r.ok) throw new Error('session expired'); adopt(j); return AUTH.token; }); });
-}
-function getToken() { return Date.now() < AUTH.exp ? Promise.resolve(AUTH.token) : refreshToken(); }
-function verifyAdmin(token) {
-  return fetch(ADMIN_VERIFY_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + token, 'apikey': SUPABASE_PUBLIC_KEY },
-    body: JSON.stringify({ action: 'overview' })
-  }).then(async function (r) {
-    var body = await r.json().catch(function () { return {}; });
-    if (!r.ok || !body.adminFirebaseUid || !body.adminUuid) {
-      throw new Error(body.error || 'This Firebase account is not authorized as a Murmur administrator.');
-    }
-    return body;
+/* ---------- Supabase sign-in (same admin account and session as the admin page) ---------- */
+var SUPABASE_URL = 'https://pkadftvqslkykehcqedj.supabase.co', SUPABASE_PUBLIC_KEY = 'sb_publishable_etoHiUGbJ96MUPzJABL12A_UiTWVxok', ADMIN_EMAIL = 'jiancarlopadua9@gmail.com';
+var ERROR_LOG_URL = SUPABASE_URL + '/functions/v1/murmur-error-log';
+var sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_PUBLIC_KEY, { auth: { persistSession: true, autoRefreshToken: true } });
+function getToken() {
+  return sb.auth.getSession().then(function (r) {
+    if (!r.data.session) throw new Error('Your session expired. Sign in again.');
+    return r.data.session.access_token;
   });
 }
-var ERROR_LOG_URL = 'https://pkadftvqslkykehcqedj.supabase.co/functions/v1/murmur-error-log';
 function logApi(method, query) {
   return getToken().then(function (token) {
-    return fetch(ERROR_LOG_URL + (query || ''), {
-      method: method,
-      headers: {
-        'Authorization': 'Bearer ' + token,
-        'apikey': SUPABASE_PUBLIC_KEY,
-        'Content-Type': 'application/json'
-      }
-    });
+    return fetch(ERROR_LOG_URL + (query || ''), { method: method, headers: { 'Authorization': 'Bearer ' + token, 'apikey': SUPABASE_PUBLIC_KEY, 'Content-Type': 'application/json' } });
   }).then(async function (response) {
     var body = await response.json().catch(function () { return {}; });
     if (!response.ok) throw new Error(body.error || 'Error log request failed (' + response.status + ').');
@@ -184,30 +156,21 @@ function logApi(method, query) {
 var gate = document.getElementById('gate'), msg = document.getElementById('err'), go = document.getElementById('go');
 function nice(e) {
   var m = String(e && e.message || e);
-  return /EMAIL_EXISTS|INVALID_PASSWORD|INVALID_LOGIN/.test(m) ? 'Wrong password for this admin account.'
-    : /OPERATION_NOT_ALLOWED/.test(m) ? 'Email/password login is off. Firebase console > Authentication > Sign-in method > Email/Password > Enable.'
-    : /WEAK_PASSWORD/.test(m) ? 'Password must be at least 6 characters.'
-    : /TOO_MANY/.test(m) ? 'Too many tries. Wait a few minutes.'
-    : /Failed to fetch|NetworkError/.test(m) ? 'No internet connection.'
-    : 'Could not log in. (' + m + ')';
-}
-async function signIn(email, pass) {
-  var j = await authCall(IDT + 'signInWithPassword', { email: email, password: pass, returnSecureToken: true });
-  adopt(j);
-  await verifyAdmin(AUTH.token);
+  return /Invalid login/i.test(m) ? 'Wrong email or password.' : /Failed to fetch|NetworkError/i.test(m) ? 'No internet connection.' : /rate limit|too many/i.test(m) ? 'Too many tries. Wait a few minutes.' : m;
 }
 document.getElementById('showPass').addEventListener('change', function (e) { document.getElementById('pass').type = e.target.checked ? 'text' : 'password'; });
 document.getElementById('loginForm').addEventListener('submit', async function (e) {
   e.preventDefault(); msg.textContent = ''; go.disabled = true;
-  var em = document.getElementById('email').value.trim().toLowerCase();
-  try { await signIn(em, document.getElementById('pass').value); start(); }
-  catch (x) { AUTH.token = ''; AUTH.refresh = ''; try { localStorage.removeItem('murmur-admin-rt'); } catch (e) {} msg.textContent = nice(x); go.disabled = false; }
+  var email = document.getElementById('email').value.trim().toLowerCase();
+  try {
+    if (email !== ADMIN_EMAIL) throw new Error('This email is not the authorized admin account.');
+    var r = await sb.auth.signInWithPassword({ email: email, password: document.getElementById('pass').value });
+    if (r.error) throw r.error;
+    start();
+  } catch (x) { msg.textContent = nice(x); go.disabled = false; }
 });
-document.getElementById('out').onclick = function () { try { localStorage.removeItem('murmur-admin-rt'); } catch (e) {} location.reload(); };
-try {
-  var rt = localStorage.getItem('murmur-admin-rt');
-  if (rt) { AUTH.refresh = rt; refreshToken().then(function () { return verifyAdmin(AUTH.token); }).then(start, function () { AUTH.token = ''; AUTH.refresh = ''; try { localStorage.removeItem('murmur-admin-rt'); } catch (e) {} }); }
-} catch (e) {}
+document.getElementById('out').onclick = function () { sb.auth.signOut().then(function () { location.reload(); }); };
+sb.auth.getSession().then(function (r) { if (r.data.session) start(); });
 
 /* ---------- error list, safe actions, and five-minute refresh cooldown ---------- */
 var errors = {}, users = {}, armed = false, started = false, loading = false;
