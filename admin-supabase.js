@@ -274,8 +274,7 @@
     const button = document.getElementById("saRefresh");
     button.disabled = true;
     try {
-      const { data, error } = await client.rpc("consume_murmur_manual_refresh");
-      if (error) throw error;
+      const data = await api("refresh");
       if (!data || !data.allowed) {
         const seconds = Number(data && data.retry_after_seconds || 0);
         throw new Error("Refresh is limited to once every five minutes. Try again in " + Math.ceil(seconds / 60) + " minute(s).");
