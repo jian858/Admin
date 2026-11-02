@@ -23,6 +23,7 @@
   })[char]);
   const dateLabel = (value) => value ? new Date(value).toLocaleString() : "—";
   let activeTab = "overview";
+  let usersPage = 1;
   let loadId = 0;
 
   function setError(message) {
@@ -127,15 +128,18 @@
           '</span><span class="sa-card-dot"></span></div><div class="sa-number">' + Number(count).toLocaleString() + '</div><div class="sa-card-foot">Current records</div></article>'
         ).join("") + '</div><section class="sa-panel sa-security-panel"><div class="sa-security-mark"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg></div><div><h2>Administration protected</h2><p>Supabase Auth is active. Every privileged action is checked by the server-side Super Admin allowlist.</p></div></section>';
       } else if (activeTab === "users") {
-        const data = await api("users");
+        const data = await api("users", { page: usersPage });
         content.innerHTML = '<section class="sa-panel"><div class="sa-toolbar"><h2>Users</h2><input class="sa-search" id="saSearch" type="search" placeholder="Search users" aria-label="Search users"></div><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Account</th><th>Username</th><th>Created</th><th>Status</th><th>Action</th></tr></thead><tbody>' +
           (data.users || []).map((user) => '<tr data-user-row="' + escapeHtml(user.id) + '"><td><strong>' + escapeHtml(user.display_name || "Unnamed") + '</strong><div class="sa-muted">' + escapeHtml(user.id) + '</div></td><td>' + escapeHtml(user.username || "—") + '</td><td>' + escapeHtml(dateLabel(user.created_at)) + '</td><td><span class="sa-status">' + (user.is_suspended ? "Suspended" : "Active") + '</span>' + (user.suspension_reason ? '<div class="sa-muted">' + escapeHtml(user.suspension_reason) + '</div>' : '') + '</td><td><div class="sa-cell-actions">' +
           (user.is_suspended ? '<button class="sa-btn sa-small" data-unsuspend="' + escapeHtml(user.id) + '">Restore</button>' : '<button class="sa-btn danger sa-small" data-suspend="' + escapeHtml(user.id) + '">Suspend</button><button class="sa-btn danger sa-small" data-schedule-delete="' + escapeHtml(user.id) + '">Schedule deletion</button>') +
           '</div></td></tr>').join("") + '</tbody></table></div></section>';
+        content.innerHTML += '<div class="sa-toolbar" style="justify-content:flex-end;align-items:center;margin-top:12px"><span class="sa-muted">Page ' + data.page + ' of ' + data.total_pages + ' · ' + Number(data.total).toLocaleString() + ' accounts</span><button class="sa-btn sa-small" id="saUsersPrev" type="button"' + (data.page <= 1 ? ' disabled' : '') + '>Previous</button><button class="sa-btn sa-small" id="saUsersNext" type="button"' + (data.page >= data.total_pages ? ' disabled' : '') + '>Next</button></div>';
         content.querySelector("#saSearch").addEventListener("input", (event) => {
           const query = event.target.value.toLowerCase();
           content.querySelectorAll("[data-user-row]").forEach((row) => { row.hidden = !row.textContent.toLowerCase().includes(query); });
         });
+        content.querySelector("#saUsersPrev").addEventListener("click", () => { if (usersPage > 1) { usersPage -= 1; loadTab(); } });
+        content.querySelector("#saUsersNext").addEventListener("click", () => { if (usersPage < data.total_pages) { usersPage += 1; loadTab(); } });
         content.querySelectorAll("[data-suspend]").forEach((button) => button.addEventListener("click", async () => {
           const reason = prompt("Enter the reason for suspension:");
           if (!reason || !reason.trim()) return;
