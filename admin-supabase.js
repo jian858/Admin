@@ -76,6 +76,7 @@
           <button class="sa-tab" data-tab="posts" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span>Posts</button>
           <button class="sa-tab" data-tab="appeals" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><path d="m12 3 8 9-8 9-8-9z"/><path d="M12 8v5m0 3h.01"/></svg></span>Appeals</button>
           <button class="sa-tab" data-tab="announcements" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><path d="m3 11 18-5v12L3 13z"/><path d="m7 14 2 7h5l-3-6"/></svg></span>Announcements</button>
+          <button class="sa-tab" data-tab="system" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4M7 9h3m4 0h3m-10 4h10"/></svg></span>System</button>
           <button class="sa-tab" data-tab="activity" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>Activity</button>
         </nav></div>
         <div id="saNotice" class="sa-message" hidden role="status"></div>
@@ -199,6 +200,22 @@
           if (!confirm("Delete this announcement?")) return;
           await actionRun(() => api("delete_announcement", { announcement_id: button.dataset.deleteAnnouncement }), "Announcement deleted.");
         }));
+      } else if (activeTab === "system") {
+        const data = await api("system");
+        const countCards = Object.entries(data.counts || {}).map(([name, count]) =>
+          '<article class="sa-card"><div class="sa-card-top"><span class="sa-muted">' + escapeHtml(name.replace(/_/g, " ")) +
+          '</span><span class="sa-card-dot"></span></div><div class="sa-number">' + Number(count).toLocaleString() + '</div><div class="sa-card-foot">Current records</div></article>'
+        ).join("");
+        const errors = data.errors || [];
+        const restrictions = data.restrictions || [];
+        content.innerHTML = '<div class="sa-section-heading"><div><span class="sa-kicker">OPERATIONS</span><h1>System health</h1><p>Read-only diagnostics and active account restrictions.</p></div><span class="sa-live"><i></i> Server response received</span></div>' +
+          '<div class="sa-grid">' + countCards + '</div>' +
+          '<section class="sa-panel"><h2>Recent application errors (' + errors.length + ')</h2><p>Latest 100 error records. User-agent and stack details are intentionally not shown here.</p><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Time</th><th>Type</th><th>Error</th><th>Page / source</th><th>Code</th></tr></thead><tbody>' +
+          (errors.length ? errors.map((item) => '<tr><td>' + escapeHtml(dateLabel(item.created_at)) + '</td><td>' + escapeHtml(item.kind || "—") + '</td><td>' + escapeHtml(item.message || "No message") + '<div class="sa-muted">' + escapeHtml(item.fingerprint || "") + '</div></td><td>' + escapeHtml(item.page || item.source || "—") + (item.line ? '<div class="sa-muted">Line ' + Number(item.line) + '</div>' : '') + '</td><td>' + escapeHtml(item.code || "—") + '</td></tr>').join("") : '<tr><td colspan="5">No application errors recorded.</td></tr>') +
+          '</tbody></table></div></section>' +
+          '<section class="sa-panel"><h2>Active restrictions (' + restrictions.length + ')</h2><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Account</th><th>Status</th><th>Reason</th><th>Starts</th><th>Ends / scheduled deletion</th></tr></thead><tbody>' +
+          (restrictions.length ? restrictions.map((item) => '<tr><td>' + escapeHtml(item.user_id) + '</td><td><span class="sa-status">' + escapeHtml(item.status) + '</span></td><td>' + escapeHtml(item.reason || item.reason_code || "—") + '</td><td>' + escapeHtml(dateLabel(item.starts_at || item.created_at)) + '</td><td>' + escapeHtml(dateLabel(item.scheduled_delete_at || item.ends_at)) + '</td></tr>').join("") : '<tr><td colspan="5">No active restrictions found.</td></tr>') +
+          '</tbody></table></div></section>';
       } else if (activeTab === "activity") {
         const data = await api("activity");
         content.innerHTML = '<section class="sa-panel"><h2>Admin activity log</h2><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Action</th><th>Target account</th><th>Reason</th><th>Date</th></tr></thead><tbody>' +
