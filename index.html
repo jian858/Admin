@@ -16,14 +16,15 @@
   MURMUR ADMIN — Supabase Auth + server-verified admin allowlist.
   Privileged reads and writes run through the murmur-admin-supabase Edge Function.
 -->
-<link rel="stylesheet" href="./styles.css?v=2" />
+<link rel="stylesheet" href="./styles.css?v=3" />
 <script>try { var t = localStorage.getItem('murmur-theme'); document.documentElement.dataset.theme = (t === 'dark' || t === 'light') ? t : (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); } catch (e) {}</script>
 </head>
 <body>
 <div class="gate" id="gate">
   <form id="loginForm">
-    <div class="logo">murmur</div>
-    <p class="sub">Admin backend</p>
+    <div class="logo"><span class="logo-mark" aria-hidden="true"></span><span>murmur</span></div>
+    <p class="sub">Your community, managed with care.</p>
+    <div class="admin-label">SECURE ADMINISTRATION</div>
     <input id="email" type="email" placeholder="Admin email" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" value="jiancarlopadua9@gmail.com" required />
     <input id="pass" type="password" placeholder="Password" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" required />
     <label class="show"><input type="checkbox" id="showPass" /> Show password</label>
