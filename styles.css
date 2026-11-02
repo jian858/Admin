@@ -106,3 +106,11 @@ button{cursor:pointer}
   @keyframes riseIn{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}
 }
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;animation:none!important;transition:none!important}}
+
+/* System diagnostics */
+.sa-panel .sa-table td{max-width:360px}
+.sa-panel .sa-table td{overflow-wrap:anywhere}
+.sa-panel .sa-table td:first-child{white-space:nowrap}
+.sa-panel .sa-table tr:hover td{background:var(--soft)}
+.sa-panel+.sa-panel{margin-top:10px}
+@media(min-width:760px){.sa-grid{grid-template-columns:repeat(4,minmax(0,1fr))}}
