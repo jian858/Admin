@@ -78,6 +78,7 @@
           <button class="sa-tab" data-tab="posts" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span>Posts</button>
           <button class="sa-tab" data-tab="appeals" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><path d="m12 3 8 9-8 9-8-9z"/><path d="M12 8v5m0 3h.01"/></svg></span>Appeals</button>
           <button class="sa-tab" data-tab="announcements" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><path d="m3 11 18-5v12L3 13z"/><path d="m7 14 2 7h5l-3-6"/></svg></span>Announcements</button>
+          <button class="sa-tab" data-tab="errors" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><path d="M12 3 2.8 19h18.4L12 3Z"/><path d="M12 9v4m0 3h.01"/></svg></span>Errors</button>
           <button class="sa-tab" data-tab="system" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4M7 9h3m4 0h3m-10 4h10"/></svg></span>System</button>
           <button class="sa-tab" data-tab="activity" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>Activity</button>
         </nav></div>
@@ -212,6 +213,19 @@
           if (!confirm("Delete this announcement?")) return;
           await actionRun(() => api("delete_announcement", { announcement_id: button.dataset.deleteAnnouncement }), "Announcement deleted.");
         }));
+      } else if (activeTab === "errors") {
+        const data = await api("errors");
+        const items = data.errors || [];
+        content.innerHTML = '<div class="sa-section-heading"><div><span class="sa-kicker">DIAGNOSTICS</span><h1>Application errors</h1><p>Latest captured crashes, failed requests and browser issues. Review details before making changes.</p></div><a class="sa-btn" href="./errors.html">Open full error log</a></div>' +
+          '<section class="sa-panel"><div class="sa-toolbar"><h2>Latest errors (' + Number(data.total || items.length) + ')</h2><input id="saErrorSearch" class="sa-search" type="search" placeholder="Search errors, page or account" aria-label="Search errors"></div>' +
+          '<div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Time</th><th>Type</th><th>Message</th><th>Account</th><th>Page / source</th><th>Details</th></tr></thead><tbody id="saErrorRows">' +
+          (items.length ? items.map((item) => '<tr data-error-row><td>' + escapeHtml(dateLabel(item.created_at)) + '</td><td><span class="sa-status">' + escapeHtml(item.kind || "unknown") + '</span></td><td>' + escapeHtml(item.message || "No message") + '<div class="sa-muted">' + escapeHtml(item.code || "") + '</div></td><td>' + escapeHtml(item.firebase_uid || "anonymous") + '</td><td>' + escapeHtml(item.page || item.source || "—") + (item.line ? '<div class="sa-muted">Line ' + Number(item.line) + (item.column_number ? ":" + Number(item.column_number) : "") + '</div>' : '') + '</td><td>' + (item.stack ? '<details><summary>Stack trace</summary><pre class="sa-error-stack">' + escapeHtml(item.stack) + '</pre></details>' : '—') + '</td></tr>').join("") : '<tr><td colspan="6">No errors have been recorded yet. The automatic reporter is connected to the app.</td></tr>') +
+          '</tbody></table></div></section>';
+        const search = content.querySelector("#saErrorSearch");
+        if (search) search.addEventListener("input", () => {
+          const q = search.value.toLowerCase();
+          content.querySelectorAll("[data-error-row]").forEach((row) => { row.hidden = !row.textContent.toLowerCase().includes(q); });
+        });
       } else if (activeTab === "system") {
         const data = await api("system");
         const countCards = Object.entries(data.counts || {}).map(([name, count]) =>
