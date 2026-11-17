@@ -74,6 +74,7 @@
         </header><nav class="sa-tabs" aria-label="Admin sections">
           <button class="sa-tab" data-tab="overview" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="5" rx="2"/><rect x="13" y="10" width="8" height="11" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/></svg></span>Overview</button>
           <button class="sa-tab" data-tab="users" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17" cy="9" r="2.6"/><path d="M17 14c2.8 0 4.7 1.8 4.7 4.5"/></svg></span>Users</button>
+          <button class="sa-tab" data-tab="identities" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><circle cx="7" cy="12" r="3"/><circle cx="17" cy="12" r="3"/><path d="M10 12h4"/></svg></span>Account IDs</button>
           <button class="sa-tab" data-tab="reports" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></span>Reports</button>
           <button class="sa-tab" data-tab="posts" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span>Posts</button>
           <button class="sa-tab" data-tab="appeals" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><path d="m12 3 8 9-8 9-8-9z"/><path d="M12 8v5m0 3h.01"/></svg></span>Appeals</button>
@@ -174,6 +175,15 @@
           if (!confirm("Schedule this account for deletion? The account will be suspended immediately.")) return;
           await actionRun(() => api("schedule_delete", { user_id: button.dataset.scheduleDelete, reason: reason.trim(), delete_at: date.toISOString() }), "Deletion scheduled. Final deletion still requires the trusted server deletion worker.");
         }));
+      } else if (activeTab === "identities") {
+        const data = await api("identities");
+        const identities = data.identities || [];
+        content.innerHTML = '<div class="sa-section-heading"><div><span class="sa-kicker">PRIVATE ADMIN VIEW</span><h1>Linked account IDs</h1><p>Each row is one Murmur identity with its Firebase UID and separate Supabase UUID.</p></div><span class="sa-live"><i></i> Admin only</span></div>' +
+          '<section class="sa-panel"><div class="sa-toolbar"><h2>Identity links (' + Number(data.total || identities.length).toLocaleString() + ')</h2><span class="sa-muted">Only visible to the authorized Super Admin</span></div>' +
+          '<div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Account</th><th>Firebase UID</th><th>Supabase ID</th><th>Linked</th></tr></thead><tbody>' +
+          (identities.length ? identities.map((item) => '<tr><td><strong>' + escapeHtml(item.display_name || "Unnamed account") + '</strong><div class="sa-muted">' + escapeHtml(item.username || "No username") + '</div></td><td><code>' + escapeHtml(item.firebase_uid) + '</code></td><td><code>' + escapeHtml(item.supabase_id) + '</code></td><td>' + escapeHtml(dateLabel(item.linked_at)) + '</td></tr>').join("") :
+          '<tr><td colspan="4">No linked identities have been recorded yet.</td></tr>') +
+          '</tbody></table></div></section>';
       } else if (activeTab === "reports") {
         const data = await api("reports");
         content.innerHTML = '<section class="sa-panel"><h2>Reports</h2><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Reason / details</th><th>Reported user</th><th>Date</th><th>Status</th><th>Action</th></tr></thead><tbody>' +
