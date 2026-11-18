@@ -275,8 +275,9 @@
             previewResult.hidden = false;
             approvedCampaignId = "";
           } catch (error) {
-            previewResult.textContent = error.message || "The campaign could not be sent. If a batch partially succeeded, retry with the same campaign ID only after reviewing provider logs.";
+            previewResult.textContent = (error.message || "The campaign could not be sent.") + " You can retry this exact campaign; its idempotency keys are retained for this preview.";
             previewResult.hidden = false;
+            sendButton.disabled = false;
           } finally { previewButton.disabled = false; sendButton.disabled = true; }
         });
       } else if (activeTab === "errors") {
