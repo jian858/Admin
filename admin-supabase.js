@@ -1,6 +1,5 @@
-/* Murmur Admin — Supabase-only client.
-   Authentication uses Supabase Auth. Every privileged read/write is performed
-   by the murmur-admin-supabase Edge Function, which verifies the allowlist. */
+/* Murmur Admin — Firebase Authentication with server-verified admin allowlist.
+   The browser never decides administrator authorization. */
 (function () {
   "use strict";
 
@@ -8,9 +7,8 @@
   const SUPABASE_KEY = "sb_publishable_etoHiUGbJ96MUPzJABL12A_UiTWVxok";
   const ADMIN_EMAIL = "jiancarlopadua9@gmail.com";
   const FUNCTION_URL = SUPABASE_URL + "/functions/v1/murmur-admin-supabase";
-  const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
-  });
+  const adminAuth = window.murmurAdminAuth;
+  if (!adminAuth) throw new Error("Firebase Admin sign-in is not initialized.");
 
   const gate = document.getElementById("gate");
   const form = document.getElementById("loginForm");
@@ -34,14 +32,15 @@
   }
 
   async function api(action, payload) {
-    const { data: sessionData, error: sessionError } = await client.auth.getSession();
-    if (sessionError || !sessionData.session) throw new Error("Your session expired. Sign in again.");
+    const currentUser = adminAuth.currentUser;
+    if (!currentUser) throw new Error("Your Firebase session expired. Sign in again.");
+    const firebaseToken = await currentUser.getIdToken();
     const response = await fetch(FUNCTION_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "apikey": SUPABASE_KEY,
-        "Authorization": "Bearer " + sessionData.session.access_token
+        "Authorization": "Bearer " + firebaseToken
       },
       body: JSON.stringify({ action, ...(payload || {}) })
     });
@@ -78,6 +77,7 @@
           <button class="sa-tab" data-tab="reports" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></span>Reports</button>
           <button class="sa-tab" data-tab="posts" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span>Posts</button>
           <button class="sa-tab" data-tab="appeals" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><path d="m12 3 8 9-8 9-8-9z"/><path d="M12 8v5m0 3h.01"/></svg></span>Appeals</button>
+          <button class="sa-tab" data-tab="email" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m4 7 8 6 8-6"/></svg></span>Email Campaigns</button>
           <button class="sa-tab" data-tab="announcements" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><path d="m3 11 18-5v12L3 13z"/><path d="m7 14 2 7h5l-3-6"/></svg></span>Announcements</button>
           <button class="sa-tab" data-tab="errors" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><path d="M12 3 2.8 19h18.4L12 3Z"/><path d="M12 9v4m0 3h.01"/></svg></span>Errors</button>
           <button class="sa-tab" data-tab="system" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4M7 9h3m4 0h3m-10 4h10"/></svg></span>System</button>
@@ -223,6 +223,63 @@
           if (!confirm("Delete this announcement?")) return;
           await actionRun(() => api("delete_announcement", { announcement_id: button.dataset.deleteAnnouncement }), "Announcement deleted.");
         }));
+      } else if (activeTab === "email") {
+        content.innerHTML = '<div class="sa-section-heading"><div><span class="sa-kicker">DIRECT COMMUNICATION</span><h1>Email campaigns</h1><p>Send essential Murmur service and product announcements to verified account email addresses.</p></div><span class="sa-live"><i></i> Server-side delivery</span></div>' +
+          '<section class="sa-panel"><form id="saEmailCampaignForm"><label class="sa-field-label" for="saEmailSubject">Email subject</label><input class="sa-search" id="saEmailSubject" name="subject" maxlength="180" required placeholder="Important Murmur update" style="display:block;max-width:none;width:100%;margin:8px 0 14px"><label class="sa-field-label" for="saEmailMessage">Message</label><textarea class="sa-search" id="saEmailMessage" name="message" maxlength="5000" rows="8" required placeholder="Write your message. Plain text only." style="display:block;max-width:none;width:100%;margin:8px 0 14px"></textarea><p class="sa-muted">Only verified Supabase Auth account emails are included. If a Firebase-only Murmur account is not mirrored into Supabase Auth, it will be missing; identity synchronization must be verified before claiming this reaches every Murmur user. Use only for essential service, safety, account, or product updates—not promotional marketing. The Resend API key and sender address must be configured as Supabase Edge Function secrets.</p><div class="sa-actions"><button class="sa-btn" id="saEmailPreview" type="button">Preview recipients</button><button class="sa-btn primary" id="saEmailSend" type="submit" disabled>Send campaign</button></div><div id="saEmailPreviewResult" class="sa-message" role="status" hidden style="margin-top:12px"></div></form></section><section class="sa-panel"><h2>Sending safeguards</h2><p>Every recipient receives a separate email. The service uses batch idempotency keys to reduce duplicate sends if a request is retried. Resend acceptance does not guarantee inbox delivery; delivery events require a separately configured webhook.</p></section>';
+        const form = content.querySelector("#saEmailCampaignForm");
+        const previewButton = content.querySelector("#saEmailPreview");
+        const sendButton = content.querySelector("#saEmailSend");
+        const previewResult = content.querySelector("#saEmailPreviewResult");
+        let approvedCampaignId = "";
+        let previewedSubject = "";
+        let previewedMessage = "";
+        previewButton.addEventListener("click", async () => {
+          const subject = form.elements.subject.value.trim();
+          const message = form.elements.message.value.trim();
+          if (!subject || !message) { notice("Enter an email subject and message first."); return; }
+          previewButton.disabled = true;
+          sendButton.disabled = true;
+          try {
+            const result = await api("preview_email_campaign", { subject, message });
+            approvedCampaignId = crypto.randomUUID();
+            previewedSubject = subject;
+            previewedMessage = message;
+            previewResult.textContent = result.recipient_count + " verified recipient(s) will receive this service announcement. Sender configured: " + (result.sender_configured ? "yes" : "no") + ".";
+            previewResult.hidden = false;
+            sendButton.disabled = !result.sender_configured || result.recipient_count < 1;
+          } catch (error) {
+            previewResult.textContent = error.message || "Could not preview recipients.";
+            previewResult.hidden = false;
+          } finally { previewButton.disabled = false; }
+        });
+        form.addEventListener("input", () => {
+          if (form.elements.subject.value.trim() !== previewedSubject || form.elements.message.value.trim() !== previewedMessage) {
+            approvedCampaignId = "";
+            sendButton.disabled = true;
+            previewResult.hidden = true;
+          }
+        });
+        form.addEventListener("submit", async (event) => {
+          event.preventDefault();
+          if (!approvedCampaignId) return;
+          const subject = form.elements.subject.value.trim();
+          const message = form.elements.message.value.trim();
+          if (subject !== previewedSubject || message !== previewedMessage) return;
+          const confirmed = confirm("Send this email to " + previewResult.textContent.split(" ")[0] + " verified Murmur users? This cannot be recalled.");
+          if (!confirmed) return;
+          sendButton.disabled = true;
+          previewButton.disabled = true;
+          try {
+            const result = await api("send_email_campaign", { campaign_id: approvedCampaignId, subject, message });
+            previewResult.textContent = "Resend accepted " + result.accepted + " email(s). Failed batches: " + result.failed_batches + ". This is provider acceptance, not confirmed inbox delivery.";
+            previewResult.hidden = false;
+            if (result.failed_batches > 0) { sendButton.disabled = false; } else { approvedCampaignId = ""; }
+          } catch (error) {
+            previewResult.textContent = (error.message || "The campaign could not be sent.") + " You can retry this exact campaign; its idempotency keys are retained for this preview.";
+            previewResult.hidden = false;
+            sendButton.disabled = false;
+          } finally { previewButton.disabled = false; sendButton.disabled = true; }
+        });
       } else if (activeTab === "errors") {
         const data = await api("errors");
         const items = data.errors || [];
@@ -298,7 +355,7 @@
   }
 
   async function signOut() {
-    await client.auth.signOut();
+    await adminAuth.signOut();
     const root = document.getElementById("supabaseAdmin");
     if (root) root.remove();
     gate.hidden = false;
@@ -317,19 +374,13 @@
       return;
     }
     try {
-      const { data, error } = await client.auth.signInWithPassword({
-        email,
-        password: passwordInput.value
-      });
-      if (error) throw error;
-      if (!data.session) throw new Error("Supabase did not return a valid session.");
+      const credential = await adminAuth.signInWithEmailAndPassword(email, passwordInput.value);
+      await credential.user.getIdToken(true);
       passwordInput.value = "";
       showShell();
     } catch (error) {
-      if (error.status === 401 || error.status === 403) {
-        await client.auth.signOut().catch(() => {});
-      }
-      setError(error.message || "Could not sign in with Supabase.");
+      await adminAuth.signOut().catch(() => {});
+      setError(error.message || "Could not sign in with Firebase.");
     } finally {
       submitButton.disabled = false;
     }
@@ -339,10 +390,7 @@
     passwordInput.type = event.target.checked ? "text" : "password";
   });
 
-  client.auth.getSession().then(({ data, error }) => {
-    if (error || !data.session) return;
-    // Keep a valid Supabase session during temporary API/database failures.
-    // The server still verifies the allowlist and super_admin role on every action.
-    showShell();
+  adminAuth.onAuthStateChanged((user) => {
+    if (user) showShell();
   });
 })();

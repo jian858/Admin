@@ -10,10 +10,10 @@
 <head>
 <meta charset="utf-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-<meta name="robots" content="noindex" />
+<meta name="robots" content="noindex, nofollow" />
 <title>Murmur Admin</title>
 <!--
-  MURMUR ADMIN — Supabase Auth + server-verified admin allowlist.
+  MURMUR ADMIN — Firebase Authentication + server-verified admin allowlist.
   Privileged reads and writes run through the murmur-admin-supabase Edge Function.
 -->
 <link rel="stylesheet" href="./styles.css?v=6" />
@@ -25,7 +25,7 @@
     <div class="logo"><span class="logo-mark" aria-hidden="true"></span><span>murmur</span></div>
     <p class="sub">Your community, managed with care.</p>
     <div class="admin-label">SECURE ADMINISTRATION</div>
-    <input id="email" type="email" placeholder="Admin email" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" value="jiancarlopadua9@gmail.com" required />
+    <input id="email" type="email" placeholder="Admin email" autocomplete="username" autocapitalize="off" autocorrect="off" spellcheck="false" required />
     <input id="pass" type="password" placeholder="Password" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false" required />
     <label class="show"><input type="checkbox" id="showPass" /> Show password</label>
     <noscript><div class="err">JavaScript is turned off, so the login cannot work. Open this file in your normal browser.</div></noscript>
@@ -34,8 +34,11 @@
   </form>
 </div>
 
-<script src="./error-reporter.js?v=2"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="./admin-supabase.js?v=11"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
+<script src="./firebase-admin-config.js?v=1"></script>
+<script src="./firebase-admin-auth.js?v=1"></script>
+<script src="./error-reporter.js?v=3"></script>
+<script src="./admin-supabase.js?v=13"></script>
 </body>
 </html>
