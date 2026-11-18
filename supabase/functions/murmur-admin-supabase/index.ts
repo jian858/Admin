@@ -132,6 +132,16 @@ Deno.serve(async (req: Request) => {
     }
 
     if (action === "users") {
+      type AdminUserRow = {
+        id: string;
+        firebase_uid: string;
+        username: string | null;
+        display_name: string | null;
+        created_at: string | null;
+        is_suspended: boolean;
+        suspension_reason: string | null;
+        has_profile: boolean;
+      };
       const page = Number.isInteger(body.page) ? Math.max(1, Math.min(body.page, 100000)) : 1;
       const pageSize = 50;
       const search = typeof body.q === "string" ? body.q.trim().slice(0, 80).toLowerCase() : "";
@@ -143,16 +153,16 @@ Deno.serve(async (req: Request) => {
       if (identityError) throw identityError;
       if (profilesError) throw profilesError;
       const profileById = new Map((profiles || []).map((profile) => [profile.id, profile]));
-      let users = (identityLinks || []).map((link: Record<string, unknown>) => {
+      let users: AdminUserRow[] = (identityLinks || []).map((link: Record<string, unknown>) => {
         const profile = profileById.get(link.supabase_id as string);
         return {
-          id: link.supabase_id,
-          firebase_uid: link.firebase_uid,
-          username: profile?.username ?? link.username ?? null,
-          display_name: profile?.display_name ?? link.display_name ?? null,
-          created_at: profile?.created_at ?? link.linked_at,
-          is_suspended: profile?.is_suspended ?? false,
-          suspension_reason: profile?.suspension_reason ?? null,
+          id: String(link.supabase_id),
+          firebase_uid: String(link.firebase_uid),
+          username: (profile?.username ?? link.username ?? null) as string | null,
+          display_name: (profile?.display_name ?? link.display_name ?? null) as string | null,
+          created_at: (profile?.created_at ?? link.linked_at ?? null) as string | null,
+          is_suspended: Boolean(profile?.is_suspended ?? false),
+          suspension_reason: (profile?.suspension_reason ?? null) as string | null,
           has_profile: Boolean(profile),
         };
       });
