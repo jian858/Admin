@@ -301,6 +301,91 @@ Deno.serve(async (req: Request) => {
       return reply(200, { ok: true });
     }
 
+    if (action === "preview_email_campaign" || action === "send_email_campaign") {
+      const subject = typeof body.subject === "string" ? body.subject.trim().slice(0, 180) : "";
+      const message = typeof body.message === "string" ? body.message.trim().slice(0, 5000) : "";
+      if (!subject || !message) return reply(400, { error: "An email subject and message are required." });
+      const apiKey = Deno.env.get("RESEND_API_KEY") || "";
+      const sender = Deno.env.get("RESEND_FROM_EMAIL") || "";
+      if (action === "send_email_campaign" && (!apiKey || !sender)) {
+        return reply(503, { error: "Email sending is not configured. Set RESEND_API_KEY and RESEND_FROM_EMAIL as Supabase Edge Function secrets." });
+      }
+
+      // This campaign tool is intentionally limited to essential service/product
+      // announcements. Do not use it for promotions or marketing without consent.
+      const recipients: string[] = [];
+      for (let page = 1; page <= 100; page += 1) {
+        const { data, error } = await db.auth.admin.listUsers({ page, perPage: 1000 });
+        if (error) throw error;
+        const rows = data.users || [];
+        for (const account of rows) {
+          if (account.email && account.email_confirmed_at && !account.banned_until) {
+            recipients.push(account.email.trim().toLowerCase());
+          }
+        }
+        if (rows.length < 1000 || recipients.length >= 100000) break;
+      }
+      const uniqueRecipients = [...new Set(recipients)];
+      if (action === "preview_email_campaign") {
+        return reply(200, {
+          recipient_count: uniqueRecipients.length,
+          sender_configured: Boolean(sender),
+          campaign_type: "essential_service_announcement",
+        });
+      }
+
+      const campaignId = typeof body.campaign_id === "string" ? body.campaign_id : "";
+      if (!/^[a-f0-9-]{36}$/i.test(campaignId)) {
+        return reply(400, { error: "A valid campaign ID is required. Preview the campaign again before sending." });
+      }
+      if (!uniqueRecipients.length) return reply(400, { error: "No verified recipient email addresses were found." });
+
+      const escapeHtml = (value: string) => value.replace(/[&<>"']/g, (char) => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+      })[char]);
+      const htmlMessage = escapeHtml(message).replace(/\r?\n/g, "<br>");
+      let accepted = 0;
+      let failedBatches = 0;
+      const failures: string[] = [];
+      for (let offset = 0; offset < uniqueRecipients.length; offset += 100) {
+        const chunk = uniqueRecipients.slice(offset, offset + 100);
+        const batch = chunk.map((to) => ({
+          from: sender,
+          to: [to],
+          subject,
+          text: message + "\n\nYou are receiving this because you have a Murmur account. This message is an essential service or product announcement.",
+          html: "<div style=\"font-family:Arial,sans-serif;line-height:1.6;white-space:normal\">" +
+            htmlMessage + "<hr><p style=\"color:#666;font-size:12px\">You are receiving this because you have a Murmur account. This message is an essential service or product announcement.</p></div>",
+        }));
+        const response = await fetch("https://api.resend.com/emails/batch", {
+          method: "POST",
+          headers: {
+            "Authorization": "Bearer " + apiKey,
+            "Content-Type": "application/json",
+            "Idempotency-Key": "murmur-campaign-" + campaignId + "-" + Math.floor(offset / 100),
+          },
+          body: JSON.stringify(batch),
+        });
+        const result = await response.json().catch(() => ({}));
+        if (!response.ok) {
+          failedBatches += 1;
+          failures.push("Batch " + (Math.floor(offset / 100) + 1) + ": " +
+            String(result.message || result.name || "Resend request failed").slice(0, 180));
+        } else {
+          accepted += Array.isArray(result.data) ? result.data.length : chunk.length;
+        }
+      }
+      await audit(db, user.id, "send_email_campaign", null, subject, {
+        campaign_id: campaignId, recipient_count: uniqueRecipients.length,
+        accepted, failed_batches: failedBatches,
+      });
+      return reply(failedBatches ? 207 : 200, {
+        campaign_id: campaignId, recipient_count: uniqueRecipients.length,
+        accepted, failed_batches: failedBatches, failures,
+        delivery_status: "provider_accepted_not_delivery_confirmed",
+      });
+    }
+
     if (action === "errors") {
       const { data, error, count } = await db.from("murmur_error_logs")
         .select("id,firebase_uid,kind,message,code,source,line,column_number,page,stack,fingerprint,created_at", { count: "exact" })
