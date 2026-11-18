@@ -273,7 +273,7 @@
             const result = await api("send_email_campaign", { campaign_id: approvedCampaignId, subject, message });
             previewResult.textContent = "Resend accepted " + result.accepted + " email(s). Failed batches: " + result.failed_batches + ". This is provider acceptance, not confirmed inbox delivery.";
             previewResult.hidden = false;
-            approvedCampaignId = "";
+            if (result.failed_batches > 0) { sendButton.disabled = false; } else { approvedCampaignId = ""; }
           } catch (error) {
             previewResult.textContent = (error.message || "The campaign could not be sent.") + " You can retry this exact campaign; its idempotency keys are retained for this preview.";
             previewResult.hidden = false;
