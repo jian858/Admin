@@ -16,4 +16,9 @@
   window.MurmurErrorTokenProvider = () => auth.currentUser
     ? auth.currentUser.getIdToken().catch(() => "")
     : "";
+  auth.onAuthStateChanged((user) => {
+    if (user && window.MurmurErrors && typeof window.MurmurErrors.flush === "function") {
+      window.MurmurErrors.flush();
+    }
+  });
 })();
