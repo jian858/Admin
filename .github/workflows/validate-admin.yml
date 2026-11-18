@@ -1,0 +1,39 @@
+name: Validate Murmur Admin source
+
+on:
+  pull_request:
+  push:
+    branches:
+      - main
+      - "repair/**"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check browser JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          for file in admin-supabase.js firebase-admin-config.js firebase-admin-auth.js error-reporter.js; do
+            node --check --input-type=module < "$file"
+          done
+
+      - name: Set up Deno
+        uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - name: Type-check Admin Edge Function
+        run: deno check supabase/functions/murmur-admin-supabase/index.ts
