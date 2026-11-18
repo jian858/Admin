@@ -1,6 +1,5 @@
-/* Murmur Admin — Supabase-only client.
-   Authentication uses Supabase Auth. Every privileged read/write is performed
-   by the murmur-admin-supabase Edge Function, which verifies the allowlist. */
+/* Murmur Admin — Firebase Authentication with server-verified admin allowlist.
+   The browser never decides administrator authorization. */
 (function () {
   "use strict";
 
@@ -8,9 +7,8 @@
   const SUPABASE_KEY = "sb_publishable_etoHiUGbJ96MUPzJABL12A_UiTWVxok";
   const ADMIN_EMAIL = "jiancarlopadua9@gmail.com";
   const FUNCTION_URL = SUPABASE_URL + "/functions/v1/murmur-admin-supabase";
-  const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
-    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
-  });
+  const adminAuth = window.murmurAdminAuth;
+  if (!adminAuth) throw new Error("Firebase Admin sign-in is not initialized.");
 
   const gate = document.getElementById("gate");
   const form = document.getElementById("loginForm");
@@ -34,14 +32,15 @@
   }
 
   async function api(action, payload) {
-    const { data: sessionData, error: sessionError } = await client.auth.getSession();
-    if (sessionError || !sessionData.session) throw new Error("Your session expired. Sign in again.");
+    const currentUser = adminAuth.currentUser;
+    if (!currentUser) throw new Error("Your Firebase session expired. Sign in again.");
+    const firebaseToken = await currentUser.getIdToken();
     const response = await fetch(FUNCTION_URL, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "apikey": SUPABASE_KEY,
-        "Authorization": "Bearer " + sessionData.session.access_token
+        "Authorization": "Bearer " + firebaseToken
       },
       body: JSON.stringify({ action, ...(payload || {}) })
     });
@@ -298,7 +297,7 @@
   }
 
   async function signOut() {
-    await client.auth.signOut();
+    await adminAuth.signOut();
     const root = document.getElementById("supabaseAdmin");
     if (root) root.remove();
     gate.hidden = false;
@@ -317,19 +316,13 @@
       return;
     }
     try {
-      const { data, error } = await client.auth.signInWithPassword({
-        email,
-        password: passwordInput.value
-      });
-      if (error) throw error;
-      if (!data.session) throw new Error("Supabase did not return a valid session.");
+      const credential = await adminAuth.signInWithEmailAndPassword(email, passwordInput.value);
+      await credential.user.getIdToken(true);
       passwordInput.value = "";
       showShell();
     } catch (error) {
-      if (error.status === 401 || error.status === 403) {
-        await client.auth.signOut().catch(() => {});
-      }
-      setError(error.message || "Could not sign in with Supabase.");
+      await adminAuth.signOut().catch(() => {});
+      setError(error.message || "Could not sign in with Firebase.");
     } finally {
       submitButton.disabled = false;
     }
@@ -339,10 +332,7 @@
     passwordInput.type = event.target.checked ? "text" : "password";
   });
 
-  client.auth.getSession().then(({ data, error }) => {
-    if (error || !data.session) return;
-    // Keep a valid Supabase session during temporary API/database failures.
-    // The server still verifies the allowlist and super_admin role on every action.
-    showShell();
+  adminAuth.onAuthStateChanged((user) => {
+    if (user) showShell();
   });
 })();
