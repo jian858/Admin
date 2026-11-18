@@ -78,6 +78,7 @@
           <button class="sa-tab" data-tab="reports" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></span>Reports</button>
           <button class="sa-tab" data-tab="posts" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span>Posts</button>
           <button class="sa-tab" data-tab="appeals" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><path d="m12 3 8 9-8 9-8-9z"/><path d="M12 8v5m0 3h.01"/></svg></span>Appeals</button>
+          <button class="sa-tab" data-tab="password-reset" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></span>Password Reset</button>
           <button class="sa-tab" data-tab="announcements" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><path d="m3 11 18-5v12L3 13z"/><path d="m7 14 2 7h5l-3-6"/></svg></span>Announcements</button>
           <button class="sa-tab" data-tab="errors" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><path d="M12 3 2.8 19h18.4L12 3Z"/><path d="M12 9v4m0 3h.01"/></svg></span>Errors</button>
           <button class="sa-tab" data-tab="system" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4M7 9h3m4 0h3m-10 4h10"/></svg></span>System</button>
@@ -223,6 +224,40 @@
           if (!confirm("Delete this announcement?")) return;
           await actionRun(() => api("delete_announcement", { announcement_id: button.dataset.deleteAnnouncement }), "Announcement deleted.");
         }));
+      } else if (activeTab === "password-reset") {
+        content.innerHTML = '<section class="sa-panel"><span class="sa-kicker">ACCOUNT SECURITY</span><h2>Bulk password reset</h2><p>Send each eligible Murmur account its own Firebase password-reset email. This does not change passwords or sign users out.</p><div class="sa-actions"><button class="sa-btn primary" id="saResetPreview" type="button">Preview eligible accounts</button></div><div id="saResetPreviewResult" class="sa-muted" style="margin-top:14px">Run a preview before sending. Disabled accounts and accounts without an email are excluded.</div><div class="sa-actions" style="margin-top:16px"><button class="sa-btn danger" id="saResetSend" type="button" disabled>Send reset emails</button></div><p class="sa-muted">Sending requires typing SEND PASSWORD RESET EMAILS in the confirmation prompt. Firebase sends the individual emails.</p></section>';
+        let previewReady = false;
+        content.querySelector("#saResetPreview").addEventListener("click", async () => {
+          const button = content.querySelector("#saResetPreview");
+          const resultBox = content.querySelector("#saResetPreviewResult");
+          button.disabled = true;
+          resultBox.textContent = "Checking Firebase accounts…";
+          try {
+            const data = await api("password_reset_preview");
+            resultBox.textContent = "Eligible: " + Number(data.eligible_count).toLocaleString() + " · Disabled excluded: " + Number(data.disabled_count).toLocaleString() + " · No email excluded: " + Number(data.no_email_count).toLocaleString() + " · Total Firebase accounts: " + Number(data.total_accounts).toLocaleString();
+            previewReady = true;
+            content.querySelector("#saResetSend").disabled = data.eligible_count < 1;
+          } catch (error) {
+            resultBox.textContent = error.message || "Preview failed.";
+            previewReady = false;
+            content.querySelector("#saResetSend").disabled = true;
+          } finally { button.disabled = false; }
+        });
+        content.querySelector("#saResetSend").addEventListener("click", async () => {
+          if (!previewReady) return notice("Run a fresh preview first.");
+          const confirmation = prompt('To send individual reset emails to every eligible account, type exactly: SEND PASSWORD RESET EMAILS');
+          if (confirmation !== "SEND PASSWORD RESET EMAILS") return;
+          const button = content.querySelector("#saResetSend");
+          button.disabled = true;
+          try {
+            const data = await api("password_reset_send", { confirmation });
+            notice("Password-reset campaign finished. Firebase accepted " + Number(data.sent_count) + " email requests; failed: " + Number(data.failed_count) + ".");
+            content.querySelector("#saResetPreviewResult").textContent = "Finished · Accepted: " + Number(data.sent_count) + " · Failed: " + Number(data.failed_count) + " · Disabled excluded: " + Number(data.disabled_count) + " · No email excluded: " + Number(data.no_email_count);
+            previewReady = false;
+          } catch (error) {
+            notice(error.message || "Password-reset campaign failed.");
+          } finally { button.disabled = false; }
+        });
       } else if (activeTab === "errors") {
         const data = await api("errors");
         const items = data.errors || [];
