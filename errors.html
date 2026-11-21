@@ -10,7 +10,7 @@
   RULE 1: before you add a feature, clean up the code it touches.
 
   MURMUR AUTOMATIC SYSTEM ERROR LOG  -  errors.html
-  Automatic app crashes, Firebase/database failures, storage errors, API failures, network errors, and failed resources are stored in the private Supabase system log. No user-submitted bug reports are required.
+  Automatic app crashes, Supabase/database failures, storage errors, API failures, network errors, and failed resources are stored in the private Supabase system log. No user-submitted bug reports are required.
   This page lists them, lets you search and filter, group repeats, download everything as murmur-error-log.txt,
   and clear them. Full user-submitted report details remain in the Admin Customer Support queue.
 -->
@@ -113,7 +113,7 @@ textarea.adm-in { min-height: 90px; resize: vertical; }
   <div class="el-bar">
     <input class="adm-in" id="q" placeholder="Search message, user, screen or browser" aria-label="Search errors" />
     <div class="adm-row">
-      <select class="adm-in" id="kind" aria-label="Kind"><option value="">All system errors</option><option value="__test__">Automatic test events</option><option value="crash">JavaScript crash</option><option value="firebase">Firebase / database</option><option value="storage">File storage</option><option value="api">API failure</option><option value="network">Network failure</option><option value="auth">Authentication</option><option value="feature">Feature failure</option><option value="resource">Page resource</option><option value="handled">Handled system error</option><option value="database">Database</option></select>
+      <select class="adm-in" id="kind" aria-label="Kind"><option value="">All system errors</option><option value="__test__">Automatic test events</option><option value="crash">JavaScript crash</option><option value="database">Database / Supabase</option><option value="storage">File storage</option><option value="api">API failure</option><option value="network">Network failure</option><option value="auth">Authentication</option><option value="feature">Feature failure</option><option value="resource">Page resource</option><option value="handled">Handled system error</option><option value="database">Database</option></select>
       <label class="el-check"><input type="checkbox" id="group" checked /> Group repeats</label>
     </div>
     <div class="adm-row">
@@ -130,7 +130,7 @@ textarea.adm-in { min-height: 90px; resize: vertical; }
 </main>
 
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="./error-reporter.js?v=2"></script>
+<script src="./error-reporter.js?v=3"></script>
 <script>
 /* ---------- Supabase sign-in (same admin account and session as the admin page) ---------- */
 var SUPABASE_URL = 'https://pkadftvqslkykehcqedj.supabase.co', SUPABASE_PUBLIC_KEY = 'sb_publishable_etoHiUGbJ96MUPzJABL12A_UiTWVxok', ADMIN_EMAIL = 'jiancarlopadua9@gmail.com';
@@ -226,7 +226,7 @@ async function load(force) {
     errors = {};
     (result.items || []).forEach(function (item) {
       errors[item.id] = {
-        uid: item.firebase_uid,
+        uid: item.actor_key,
         kind: item.kind,
         message: item.message,
         note: item.code ? 'Code: ' + item.code : '',
