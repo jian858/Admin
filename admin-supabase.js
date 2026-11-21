@@ -6,7 +6,6 @@
 
   const SUPABASE_URL = "https://pkadftvqslkykehcqedj.supabase.co";
   const SUPABASE_KEY = "sb_publishable_etoHiUGbJ96MUPzJABL12A_UiTWVxok";
-  const ADMIN_EMAIL = "jiancarlopadua9@gmail.com";
   const FUNCTION_URL = SUPABASE_URL + "/functions/v1/murmur-admin-supabase";
   const client = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY, {
     auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
@@ -81,8 +80,7 @@
           <button class="sa-tab" data-tab="reports" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></span>Reports</button>
           <button class="sa-tab" data-tab="posts" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span>Posts</button>
           <button class="sa-tab" data-tab="appeals" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><path d="m12 3 8 9-8 9-8-9z"/><path d="M12 8v5m0 3h.01"/></svg></span>Appeals</button>
-          <button class="sa-tab" data-tab="password-reset" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg></span>Password Reset</button>
-          <button class="sa-tab" data-tab="announcements" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><path d="m3 11 18-5v12L3 13z"/><path d="m7 14 2 7h5l-3-6"/></svg></span>Announcements</button>
+          <button class="sa-tab" <button class="sa-tab" data-tab="announcements" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><path d="m3 11 18-5v12L3 13z"/><path d="m7 14 2 7h5l-3-6"/></svg></span>Announcements</button>
           <button class="sa-tab" data-tab="errors" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><path d="M12 3 2.8 19h18.4L12 3Z"/><path d="M12 9v4m0 3h.01"/></svg></span>Errors</button>
           <button class="sa-tab" data-tab="system" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4M7 9h3m4 0h3m-10 4h10"/></svg></span>System</button>
           <button class="sa-tab" data-tab="visitors" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M2.5 20c0-3.5 2.8-5.5 6.5-5.5s6.5 2 6.5 5.5M16 14c3 0 5.5 1.8 5.5 4.5"/></svg></span>Visitors</button>
@@ -100,6 +98,7 @@
     root.querySelector("#saSignOut").addEventListener("click", signOut);
     root.querySelector("#saTheme").addEventListener("click", toggleTheme);
     loadTab();
+    if (window.MurmurErrors) window.MurmurErrors.flush();
     startVisitorLiveUpdates();
   }
 
@@ -179,7 +178,7 @@
       } else if (activeTab === "users") {
         const data = await api("users", { page: usersPage, q: usersQuery, status: usersStatus });
         content.innerHTML = '<section class="sa-panel"><div class="sa-toolbar"><h2>Users</h2><form id="saUserSearch" class="sa-actions"><input class="sa-search" id="saSearch" type="search" value="' + escapeHtml(usersQuery) + '" placeholder="Search username, name or ID" aria-label="Search users"><select class="sa-search" id="saUserStatus" aria-label="Filter account status"><option value="all">All accounts</option><option value="active">Active</option><option value="suspended">Suspended</option></select><button class="sa-btn primary" type="submit">Search</button></form></div><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Account / username</th><th>Created</th><th>Status</th><th>Action</th></tr></thead><tbody>' +
-          (data.users || []).map((user) => '<tr data-user-row="' + escapeHtml(user.id) + '"><td><strong>' + (user.username ? "@" + escapeHtml(user.username) : "Username not set") + '</strong><div class="sa-muted">' + escapeHtml(user.display_name || "Unnamed account") + '</div><div class="sa-muted">Supabase ID: ' + escapeHtml(user.id) + '</div><div class="sa-muted">Firebase UID: ' + escapeHtml(user.firebase_uid || "—") + '</div></td><td>' + escapeHtml(dateLabel(user.created_at)) + '</td><td><span class="sa-status">' + (!user.has_profile ? "Profile setup incomplete" : (user.is_suspended ? "Suspended" : "Active")) + '</span>' + (user.suspension_reason ? '<div class="sa-muted">' + escapeHtml(user.suspension_reason) + '</div>' : '') + '</td><td><div class="sa-cell-actions">' +
+          (data.users || []).map((user) => '<tr data-user-row="' + escapeHtml(user.id) + '"><td><strong>' + (user.username ? "@" + escapeHtml(user.username) : "Username not set") + '</strong><div class="sa-muted">' + escapeHtml(user.display_name || "Unnamed account") + '</div><div class="sa-muted">Supabase ID: ' + escapeHtml(user.id) + '</div><div class="sa-muted">Murmur ID: ' + escapeHtml(user.public_id || "—") + '</div></td><td>' + escapeHtml(dateLabel(user.created_at)) + '</td><td><span class="sa-status">' + (!user.has_profile ? "Profile setup incomplete" : (user.is_suspended ? "Suspended" : "Active")) + '</span>' + (user.suspension_reason ? '<div class="sa-muted">' + escapeHtml(user.suspension_reason) + '</div>' : '') + '</td><td><div class="sa-cell-actions">' +
           (!user.has_profile ? '<span class="sa-muted">Profile required before account actions</span>' : (user.is_suspended ? '<button class="sa-btn sa-small" data-unsuspend="' + escapeHtml(user.id) + '">Restore</button>' : '<button class="sa-btn danger sa-small" data-suspend="' + escapeHtml(user.id) + '">Suspend</button><button class="sa-btn danger sa-small" data-schedule-delete="' + escapeHtml(user.id) + '">Schedule deletion</button>')) +
           '</div></td></tr>').join("") + '</tbody></table></div></section>';
         content.innerHTML += '<div class="sa-toolbar" style="justify-content:flex-end;align-items:center;margin-top:12px"><span class="sa-muted">Page ' + data.page + ' of ' + data.total_pages + ' · ' + Number(data.total).toLocaleString() + ' accounts</span><button class="sa-btn sa-small" id="saUsersPrev" type="button"' + (data.page <= 1 ? ' disabled' : '') + '>Previous</button><button class="sa-btn sa-small" id="saUsersNext" type="button"' + (data.page >= data.total_pages ? ' disabled' : '') + '>Next</button></div>';
@@ -220,13 +219,13 @@
           await actionRun(() => api("schedule_delete", { user_id: button.dataset.scheduleDelete, reason: reason.trim(), delete_at: date.toISOString() }), "Deletion scheduled. Final deletion still requires the trusted server deletion worker.");
         }));
       } else if (activeTab === "identities") {
-        const data = await api("identities");
-        const identities = data.identities || [];
-        content.innerHTML = '<div class="sa-section-heading"><div><span class="sa-kicker">PRIVATE ADMIN VIEW</span><h1>Linked account IDs</h1><p>Each row is one Murmur identity with its Firebase UID and separate Supabase UUID.</p></div><span class="sa-live"><i></i> Admin only</span></div>' +
-          '<section class="sa-panel"><div class="sa-toolbar"><h2>Identity links (' + Number(data.total || identities.length).toLocaleString() + ')</h2><span class="sa-muted">Only visible to the authorized Super Admin</span></div>' +
-          '<div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Account</th><th>Firebase UID</th><th>Supabase ID</th><th>Linked</th></tr></thead><tbody>' +
-          (identities.length ? identities.map((item) => '<tr><td><strong>' + escapeHtml(item.display_name || "Unnamed account") + '</strong><div class="sa-muted">' + escapeHtml(item.username || "No username") + '</div></td><td><code>' + escapeHtml(item.firebase_uid) + '</code></td><td><code>' + escapeHtml(item.supabase_id) + '</code></td><td>' + escapeHtml(dateLabel(item.linked_at)) + '</td></tr>').join("") :
-          '<tr><td colspan="4">No linked identities have been recorded yet.</td></tr>') +
+        const data = await api("users", { page: 1, status: "all" });
+        const accounts = data.users || [];
+        content.innerHTML = '<div class="sa-section-heading"><div><span class="sa-kicker">PRIVATE ADMIN VIEW</span><h1>Murmur account IDs</h1><p>Each account has a Supabase UUID and a separate 16-character Murmur public ID. Only authorized administrators can view both.</p></div><span class="sa-live"><i></i> Admin only</span></div>' +
+          '<section class="sa-panel"><div class="sa-toolbar"><h2>Accounts (' + Number(data.total || accounts.length).toLocaleString() + ')</h2><span class="sa-muted">Showing the latest ' + accounts.length + ' accounts</span></div>' +
+          '<div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Murmur public ID</th><th>Supabase UUID</th><th>Username</th><th>Name</th><th>Created</th></tr></thead><tbody>' +
+          (accounts.length ? accounts.map((item) => '<tr><td><code>' + escapeHtml(item.public_id || "—") + '</code></td><td><code>' + escapeHtml(item.id) + '</code></td><td>' + escapeHtml(item.username || "—") + '</td><td>' + escapeHtml(item.display_name || "Unnamed account") + '</td><td>' + escapeHtml(dateLabel(item.created_at)) + '</td></tr>').join("") :
+          '<tr><td colspan="5">No Supabase accounts have been created yet.</td></tr>') +
           '</tbody></table></div></section>';
       } else if (activeTab === "reports") {
         const data = await api("reports");
@@ -267,63 +266,13 @@
           if (!confirm("Delete this announcement?")) return;
           await actionRun(() => api("delete_announcement", { announcement_id: button.dataset.deleteAnnouncement }), "Announcement deleted.");
         }));
-      } else if (activeTab === "password-reset") {
-        content.innerHTML = '<section class="sa-panel"><span class="sa-kicker">ACCOUNT SECURITY</span><h2>Send one password-reset email</h2><p>Send a real Firebase password-reset email to one account.</p><div class="sa-actions"><input class="sa-search" id="saSingleResetEmail" type="email" value="jiancarlopadua9@gmail.com" placeholder="Account email" aria-label="Account email"><button class="sa-btn primary" id="saSingleResetSend" type="button">Send reset email</button></div><p id="saSingleResetStatus" class="sa-muted" role="status" style="margin-top:10px">No email has been sent yet.</p></section><section class="sa-panel"><span class="sa-kicker">ACCOUNT SECURITY</span><h2>Bulk password reset</h2><p>Send each eligible Murmur account its own Firebase password-reset email. This does not change passwords or sign users out.</p><div class="sa-actions"><button class="sa-btn primary" id="saResetPreview" type="button">Preview eligible accounts</button></div><div id="saResetPreviewResult" class="sa-muted" style="margin-top:14px">Run a preview before sending. Disabled accounts and accounts without an email are excluded.</div><div class="sa-actions" style="margin-top:16px"><button class="sa-btn danger" id="saResetSend" type="button" disabled>Send reset emails</button></div><p class="sa-muted">Sending requires typing SEND PASSWORD RESET EMAILS in the confirmation prompt. Firebase sends the individual emails.</p></section>';
-        content.querySelector("#saSingleResetSend").addEventListener("click", async () => {
-          const emailInput = content.querySelector("#saSingleResetEmail");
-          const status = content.querySelector("#saSingleResetStatus");
-          const email = emailInput.value.trim().toLowerCase();
-          if (!email || !emailInput.checkValidity()) { status.textContent = "Enter a valid email address."; return; }
-          if (!confirm("Send a Firebase password-reset email to " + email + "?")) return;
-          const button = content.querySelector("#saSingleResetSend");
-          button.disabled = true;
-          status.textContent = "Contacting Firebase securely…";
-          try {
-            const data = await api("password_reset_single", { email });
-            status.textContent = data.accepted ? "Firebase accepted the password-reset email request for " + data.email + ". Check the inbox and spam folder." : "Firebase did not accept the request.";
-          } catch (error) {
-            status.textContent = error.message || "Could not send the password-reset email.";
-          } finally { button.disabled = false; }
-        });
-        let previewReady = false;
-        content.querySelector("#saResetPreview").addEventListener("click", async () => {
-          const button = content.querySelector("#saResetPreview");
-          const resultBox = content.querySelector("#saResetPreviewResult");
-          button.disabled = true;
-          resultBox.textContent = "Checking Firebase accounts…";
-          try {
-            const data = await api("password_reset_preview");
-            resultBox.textContent = "Eligible: " + Number(data.eligible_count).toLocaleString() + " · Disabled excluded: " + Number(data.disabled_count).toLocaleString() + " · No email excluded: " + Number(data.no_email_count).toLocaleString() + " · Total Firebase accounts: " + Number(data.total_accounts).toLocaleString();
-            previewReady = true;
-            content.querySelector("#saResetSend").disabled = data.eligible_count < 1;
-          } catch (error) {
-            resultBox.textContent = error.message || "Preview failed.";
-            previewReady = false;
-            content.querySelector("#saResetSend").disabled = true;
-          } finally { button.disabled = false; }
-        });
-        content.querySelector("#saResetSend").addEventListener("click", async () => {
-          if (!previewReady) return notice("Run a fresh preview first.");
-          const confirmation = prompt('To send individual reset emails to every eligible account, type exactly: SEND PASSWORD RESET EMAILS');
-          if (confirmation !== "SEND PASSWORD RESET EMAILS") return;
-          const button = content.querySelector("#saResetSend");
-          button.disabled = true;
-          try {
-            const data = await api("password_reset_send", { confirmation });
-            notice("Password-reset campaign finished. Firebase accepted " + Number(data.sent_count) + " email requests; failed: " + Number(data.failed_count) + ".");
-            content.querySelector("#saResetPreviewResult").textContent = "Finished · Accepted: " + Number(data.sent_count) + " · Failed: " + Number(data.failed_count) + " · Disabled excluded: " + Number(data.disabled_count) + " · No email excluded: " + Number(data.no_email_count);
-            previewReady = false;
-          } catch (error) {
-            notice(error.message || "Password-reset campaign failed.");
-          } finally { button.disabled = false; }
-        });
       } else if (activeTab === "errors") {
         const data = await api("errors");
         const items = data.errors || [];
         content.innerHTML = '<div class="sa-section-heading"><div><span class="sa-kicker">DIAGNOSTICS</span><h1>Application errors</h1><p>Latest captured crashes, failed requests and browser issues. Review details before making changes.</p></div><a class="sa-btn" href="./errors.html">Open full error log</a></div>' +
           '<section class="sa-panel"><div class="sa-toolbar"><h2>Latest errors (' + Number(data.total || items.length) + ')</h2><input id="saErrorSearch" class="sa-search" type="search" placeholder="Search errors, page or account" aria-label="Search errors"></div>' +
           '<div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Time</th><th>Type</th><th>Message</th><th>Account</th><th>Page / source</th><th>Details</th></tr></thead><tbody id="saErrorRows">' +
-          (items.length ? items.map((item) => '<tr data-error-row><td>' + escapeHtml(dateLabel(item.created_at)) + '</td><td><span class="sa-status">' + escapeHtml(item.kind || "unknown") + '</span></td><td>' + escapeHtml(item.message || "No message") + '<div class="sa-muted">' + escapeHtml(item.code || "") + '</div></td><td>' + escapeHtml(item.firebase_uid || "anonymous") + '</td><td>' + escapeHtml(item.page || item.source || "—") + (item.line ? '<div class="sa-muted">Line ' + Number(item.line) + (item.column_number ? ":" + Number(item.column_number) : "") + '</div>' : '') + '</td><td>' + (item.stack ? '<details><summary>Stack trace</summary><pre class="sa-error-stack">' + escapeHtml(item.stack) + '</pre></details>' : '—') + '</td></tr>').join("") : '<tr><td colspan="6">No errors have been recorded yet. The automatic reporter is connected to the app.</td></tr>') +
+          (items.length ? items.map((item) => '<tr data-error-row><td>' + escapeHtml(dateLabel(item.created_at)) + '</td><td><span class="sa-status">' + escapeHtml(item.kind || "unknown") + '</span></td><td>' + escapeHtml(item.message || "No message") + '<div class="sa-muted">' + escapeHtml(item.code || "") + '</div></td><td>' + escapeHtml(item.actor_key || "anonymous") + '</td><td>' + escapeHtml(item.page || item.source || "—") + (item.line ? '<div class="sa-muted">Line ' + Number(item.line) + (item.column_number ? ":" + Number(item.column_number) : "") + '</div>' : '') + '</td><td>' + (item.stack ? '<details><summary>Stack trace</summary><pre class="sa-error-stack">' + escapeHtml(item.stack) + '</pre></details>' : '—') + '</td></tr>').join("") : '<tr><td colspan="6">No errors have been recorded yet. The automatic reporter is connected to the app.</td></tr>') +
           '</tbody></table></div></section>';
         const search = content.querySelector("#saErrorSearch");
         if (search) search.addEventListener("input", () => {
@@ -366,8 +315,8 @@
           '<section class="sa-panel"><div class="sa-toolbar"><h2>Latest visits</h2><span class="sa-muted" id="saVisitorLastUpdated">Updated just now</span></div><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Page</th><th>Anonymous visitor ID</th><th>Time</th></tr></thead><tbody>' +
           (recent.length ? recent.map(item => '<tr><td>' + escapeHtml(item.page_path) + '</td><td><code>' + escapeHtml(item.visitor_id) + '</code></td><td>' + escapeHtml(dateLabel(item.visited_at)) + '</td></tr>').join('') : '<tr><td colspan="3">No visits recorded yet.</td></tr>') +
           '</tbody></table></div></section>' +
-          '<section class="sa-panel"><h2>Phone IDs and duplicate accounts</h2><p class="sa-muted">Phone IDs are stored in Supabase and are separate from Firebase and Supabase account IDs. Multiple accounts linked to one device are flagged as duplicates.</p><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Device label</th><th>Phone code</th><th>Accounts on device</th><th>Account IDs</th><th>Last seen</th></tr></thead><tbody>' +
-          ((data.phone_devices || []).length ? data.phone_devices.map(item => '<tr><td>' + (item.duplicate_phone ? '<span class="sa-status">' + escapeHtml(item.admin_label) + '</span>' : escapeHtml(item.admin_label)) + '</td><td><code>' + escapeHtml(item.phone_code || '') + '</code></td><td>' + Number(item.linked_accounts || 0) + '</td><td>' + ((item.accounts || []).map(account => '<div><code>' + escapeHtml(account.firebase_uid) + '</code><br><small>' + escapeHtml(account.supabase_id) + '</small></div>').join('<hr>') || 'No registered accounts') + '</td><td>' + escapeHtml(dateLabel(item.last_seen_at)) + '</td></tr>').join('') : '<tr><td colspan="5">No registered phone/account links yet. Accounts will appear after signing in.</td></tr>') +
+          '<section class="sa-panel"><h2>Phone IDs and duplicate accounts</h2><p class="sa-muted">Device links are stored in Supabase. Each linked account shows its Supabase UUID and Murmur public ID; multiple accounts linked to one device are flagged as duplicates.</p><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Device label</th><th>Phone code</th><th>Accounts on device</th><th>Account IDs</th><th>Last seen</th></tr></thead><tbody>' +
+          ((data.phone_devices || []).length ? data.phone_devices.map(item => '<tr><td>' + (item.duplicate_phone ? '<span class="sa-status">' + escapeHtml(item.admin_label) + '</span>' : escapeHtml(item.admin_label)) + '</td><td><code>' + escapeHtml(item.phone_code || '') + '</code></td><td>' + Number(item.linked_accounts || 0) + '</td><td>' + ((item.accounts || []).map(account => '<div><code>' + escapeHtml(account.supabase_id) + '</code><br><small>Murmur ID: ' + escapeHtml(account.murmur_id || '—') + '</small></div>').join('<hr>') || 'No registered accounts') + '</td><td>' + escapeHtml(dateLabel(item.last_seen_at)) + '</td></tr>').join('') : '<tr><td colspan="5">No registered phone/account links yet. Accounts will appear after signing in.</td></tr>') +
           '</tbody></table></div></section>';
       } else if (activeTab === "activity") {
         const data = await api("activity");
@@ -439,11 +388,6 @@
     setError("");
     submitButton.disabled = true;
     const email = emailInput.value.trim().toLowerCase();
-    if (email !== ADMIN_EMAIL) {
-      setError("This email is not the authorized admin account.");
-      submitButton.disabled = false;
-      return;
-    }
     try {
       const { data, error } = await client.auth.signInWithPassword({
         email,
