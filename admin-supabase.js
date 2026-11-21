@@ -27,6 +27,9 @@
   let usersQuery = "";
   let usersStatus = "all";
   let loadId = 0;
+  let visitorChannel = null;
+  let visitorReloadTimer = null;
+  let visitorRealtimeStatus = "connecting";
 
   function setError(message) {
     errorBox.textContent = message || "";
@@ -97,6 +100,41 @@
     root.querySelector("#saSignOut").addEventListener("click", signOut);
     root.querySelector("#saTheme").addEventListener("click", toggleTheme);
     loadTab();
+    startVisitorLiveUpdates();
+  }
+
+  function startVisitorLiveUpdates() {
+    if (visitorChannel) return;
+    visitorRealtimeStatus = "connecting";
+    visitorChannel = client.channel("admin:visitors", { config: { private: true } })
+      .on("broadcast", { event: "visitor-change" }, () => {
+        if (activeTab !== "visitors") return;
+        if (visitorReloadTimer) clearTimeout(visitorReloadTimer);
+        visitorReloadTimer = setTimeout(() => {
+          visitorReloadTimer = null;
+          if (activeTab === "visitors") loadTab();
+        }, 650);
+      })
+      .subscribe((status) => {
+        visitorRealtimeStatus = status === "SUBSCRIBED" ? "live" :
+          (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED" ? "reconnecting" : "connecting");
+        const statusNode = document.getElementById("saVisitorLiveStatus");
+        if (statusNode) {
+          statusNode.textContent = visitorRealtimeStatus === "live" ? "Live updates connected" :
+            (visitorRealtimeStatus === "reconnecting" ? "Reconnecting live updates…" : "Connecting live updates…");
+          statusNode.classList.toggle("is-live", visitorRealtimeStatus === "live");
+        }
+        if (status === "SUBSCRIBED" && activeTab === "visitors") loadTab();
+      });
+  }
+
+  async function stopVisitorLiveUpdates() {
+    if (visitorReloadTimer) { clearTimeout(visitorReloadTimer); visitorReloadTimer = null; }
+    if (visitorChannel) {
+      const channel = visitorChannel;
+      visitorChannel = null;
+      await client.removeChannel(channel);
+    }
   }
 
   function toggleTheme() {
@@ -309,7 +347,7 @@
         const daily = data.daily || [];
         const pages = data.pages || [];
         const recent = data.recent || [];
-        content.innerHTML = '<div class="sa-section-heading"><div><span class="sa-kicker">AUDIENCE ANALYTICS</span><h1>Visitors</h1><p>Anonymous website visits, including people who have not registered or logged in.</p></div><span class="sa-live"><i></i> Guest tracking active</span></div>' +
+        content.innerHTML = '<div class="sa-section-heading"><div><span class="sa-kicker">AUDIENCE ANALYTICS</span><h1>Visitors</h1><p>Anonymous website visits, including people who have not registered or logged in.</p></div><span class="sa-live is-live" id="saVisitorLiveStatus"><i></i> Live updates connected</span></div>' +
           '<div class="sa-grid">' +
           [['Unique devices', data.unique_visitors], ['Raw page visits', data.total_visits], ['New devices today', data.unique_visitors_today], ['Page visits today', data.visits_today_sample]].map(([label, value]) =>
             '<article class="sa-card"><div class="sa-card-top"><span class="sa-muted">' + escapeHtml(label) + '</span><span class="sa-card-dot"></span></div><div class="sa-number">' + Number(value || 0).toLocaleString() + '</div><div class="sa-card-foot">Recorded anonymous IDs</div></article>'
@@ -321,7 +359,7 @@
           '<section class="sa-panel"><h2>Most visited pages</h2><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Page</th><th>Visits</th></tr></thead><tbody>' +
           (pages.length ? pages.map(item => '<tr><td>' + escapeHtml(item.path) + '</td><td>' + Number(item.visits).toLocaleString() + '</td></tr>').join('') : '<tr><td colspan="2">No page visits recorded yet.</td></tr>') +
           '</tbody></table></div></section>' +
-          '<section class="sa-panel"><h2>Latest visits</h2><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Page</th><th>Anonymous visitor ID</th><th>Time</th></tr></thead><tbody>' +
+          '<section class="sa-panel"><div class="sa-toolbar"><h2>Latest visits</h2><span class="sa-muted" id="saVisitorLastUpdated">Updated just now</span></div><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Page</th><th>Anonymous visitor ID</th><th>Time</th></tr></thead><tbody>' +
           (recent.length ? recent.map(item => '<tr><td>' + escapeHtml(item.page_path) + '</td><td><code>' + escapeHtml(item.visitor_id) + '</code></td><td>' + escapeHtml(dateLabel(item.visited_at)) + '</td></tr>').join('') : '<tr><td colspan="3">No visits recorded yet.</td></tr>') +
           '</tbody></table></div></section>';
       } else if (activeTab === "activity") {
@@ -331,6 +369,16 @@
       }
       if (run !== loadId) return;
       host.replaceChildren(...content.childNodes);
+      if (activeTab === "visitors") {
+        const updated = document.getElementById("saVisitorLastUpdated");
+        if (updated) updated.textContent = "Updated " + new Date().toLocaleTimeString();
+        const statusNode = document.getElementById("saVisitorLiveStatus");
+        if (statusNode) {
+          statusNode.textContent = visitorRealtimeStatus === "live" ? "Live updates connected" :
+            (visitorRealtimeStatus === "reconnecting" ? "Reconnecting live updates…" : "Connecting live updates…");
+          statusNode.classList.toggle("is-live", visitorRealtimeStatus === "live");
+        }
+      }
     } catch (error) {
       if (run !== loadId) return;
       if (window.MurmurErrors) window.MurmurErrors.report("handled", error, { page: "admin-" + activeTab });
@@ -370,6 +418,7 @@
   }
 
   async function signOut() {
+    await stopVisitorLiveUpdates();
     await client.auth.signOut();
     const root = document.getElementById("supabaseAdmin");
     if (root) root.remove();
