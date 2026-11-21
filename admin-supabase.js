@@ -103,7 +103,11 @@
     startVisitorLiveUpdates();
   }
 
-  function startVisitorLiveUpdates() {
+  async function startVisitorLiveUpdates() {
+    if (visitorChannel) return;
+    const { data: sessionData, error: sessionError } = await client.auth.getSession();
+    if (sessionError || !sessionData.session) return;
+    await client.realtime.setAuth(sessionData.session.access_token);
     if (visitorChannel) return;
     visitorRealtimeStatus = "connecting";
     visitorChannel = client.channel("admin:visitors", { config: { private: true } })
