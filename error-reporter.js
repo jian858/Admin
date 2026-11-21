@@ -32,22 +32,34 @@
   function readQueue() { try { return JSON.parse(localStorage.getItem(QUEUE_KEY) || "[]"); } catch (_) { return []; } }
   function writeQueue(list) { try { localStorage.setItem(QUEUE_KEY, JSON.stringify(list.slice(-MAX_QUEUED))); } catch (_) {} }
   function post(item) {
-    if (!nativeFetch) return Promise.reject(new Error("Fetch unavailable"));
+    if (!nativeFetch) return Promise.resolve(false);
     return sessionToken().then(function (token) {
+      // The log endpoint requires a verified Supabase JWT. Do not queue,
+      // retry, or impersonate a session when the Admin user is signed out.
+      if (!token) return false;
       return nativeFetch(LOG_URL, {
         method: "POST", keepalive: true,
-        headers: { "Content-Type": "application/json", "apikey": KEY, "Authorization": "Bearer " + (token || KEY) },
+        headers: { "Content-Type": "application/json", "apikey": KEY, "Authorization": "Bearer " + token },
         body: JSON.stringify(item)
+      }).then(function (response) {
+        if (response.status === 401 || response.status === 403) return false;
+        if (!response.ok) throw new Error("error log " + response.status);
+        return true;
       });
-    }).then(function (response) {
-      if (!response.ok) throw new Error("error log " + response.status);
     });
   }
   function flush() {
     var list = readQueue();
     if (!list.length || !nativeFetch) return;
-    writeQueue([]);
-    list.forEach(function (item) { post(item).catch(function () { writeQueue(readQueue().concat(item)); }); });
+    sessionToken().then(function (token) {
+      if (!token) return;
+      writeQueue([]);
+      list.forEach(function (item) {
+        post(item).then(function (sent) {
+          if (!sent) return;
+        }).catch(function () { writeQueue(readQueue().concat(item)); });
+      });
+    });
   }
   function report(kind, message, extra) {
     if (!nativeFetch) return;
@@ -61,7 +73,14 @@
       source: location.href.split(/[?#]/)[0],
       user_agent: navigator.userAgent
     }, extra || {});
-    post(item).catch(function () { writeQueue(readQueue().concat(item)); });
+    post(item).then(function (sent) {
+      if (!sent) return;
+    }).catch(function () {
+      // Queue only authenticated reports that failed for transient reasons.
+      sessionToken().then(function (token) {
+        if (token) writeQueue(readQueue().concat(item));
+      });
+    });
   }
   function reportError(kind, error, extra) {
     var message = error && error.message ? error.message : String(error || "Unknown error");
