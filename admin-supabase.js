@@ -21,6 +21,28 @@
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
   })[char]);
   const dateLabel = (value) => value ? new Date(value).toLocaleString() : "—";
+  const RESTRICTION_REASONS = [
+    { code: "spam", label: "Spam or fake engagement" },
+    { code: "harassment", label: "Harassment or bullying" },
+    { code: "hate_speech", label: "Hate speech or discriminatory content" },
+    { code: "impersonation", label: "Impersonation" },
+    { code: "fraud", label: "Scams or fraud" },
+    { code: "sexual_content", label: "Sexual or explicit content" },
+    { code: "violence", label: "Violence or threats" },
+    { code: "child_safety", label: "Child safety concern" },
+    { code: "repeated_violations", label: "Repeated policy violations" },
+    { code: "other", label: "Other" }
+  ];
+  function askRestrictionReason(title) {
+    const choices = RESTRICTION_REASONS.map((item, index) => (index + 1) + ". " + item.label).join("\\n");
+    const choice = prompt(title + "\\n\\n" + choices + "\\n\\nEnter a number from 1 to 10:", "10");
+    if (choice === null) return null;
+    const selected = RESTRICTION_REASONS[Number(choice.trim()) - 1];
+    if (!selected) { notice("Choose one of the ten listed reasons."); return null; }
+    const details = prompt("Add details for the selected reason:");
+    if (!details || !details.trim()) { notice("Reason details are required."); return null; }
+    return { reason_code: selected.code, reason: (selected.label + ": " + details.trim()).slice(0, 500) };
+  }
   let activeTab = "overview";
   let usersPage = 1;
   let usersQuery = "";
@@ -199,24 +221,32 @@
         content.querySelector("#saUsersPrev").addEventListener("click", () => { if (usersPage > 1) { usersPage -= 1; loadTab(); } });
         content.querySelector("#saUsersNext").addEventListener("click", () => { if (usersPage < data.total_pages) { usersPage += 1; loadTab(); } });
         content.querySelectorAll("[data-suspend]").forEach((button) => button.addEventListener("click", async () => {
-          const reason = prompt("Enter the reason for suspension:");
-          if (!reason || !reason.trim()) return;
-          const duration = prompt("Suspension duration in hours. Leave blank for indefinite suspension:", "24");
+          const reason = askRestrictionReason("Choose the reason for suspending this account:");
+          if (!reason) return;
+          const duration = prompt("Suspension duration in hours (1–8760):", "24");
           if (duration === null) return;
-          await actionRun(() => api("set_user_status", { user_id: button.dataset.suspend, suspended: true, reason: reason.trim(), duration_hours: duration.trim() || null }), "Account suspended.");
+          const hours = Number(duration.trim());
+          if (!Number.isFinite(hours) || hours <= 0 || hours > 8760) { notice("Choose a duration between 1 and 8760 hours."); return; }
+          await actionRun(() => api("set_user_status", {
+            user_id: button.dataset.suspend, suspended: true,
+            reason: reason.reason, reason_code: reason.reason_code, duration_hours: hours
+          }), "Account suspended.");
         }));
         content.querySelectorAll("[data-unsuspend]").forEach((button) => button.addEventListener("click", async () => {
           await actionRun(() => api("set_user_status", { user_id: button.dataset.unsuspend, suspended: false }), "Account restored.");
         }));
         content.querySelectorAll("[data-schedule-delete]").forEach((button) => button.addEventListener("click", async () => {
-          const reason = prompt("Enter the reason for account deletion:");
-          if (!reason || !reason.trim()) return;
+          const reason = askRestrictionReason("Choose the reason for scheduling account deletion:");
+          if (!reason) return;
           const when = prompt("Enter the deletion date and time (example: 2026-12-01T09:00):");
           if (!when) return;
           const date = new Date(when);
           if (!Number.isFinite(date.getTime()) || date.getTime() <= Date.now()) { notice("Choose a valid future date and time."); return; }
-          if (!confirm("Schedule this account for deletion? The account will be suspended immediately.")) return;
-          await actionRun(() => api("schedule_delete", { user_id: button.dataset.scheduleDelete, reason: reason.trim(), delete_at: date.toISOString() }), "Deletion scheduled. Final deletion still requires the trusted server deletion worker.");
+          if (!confirm("Schedule this account for deletion? The account will be suspended immediately and automatically deleted at the scheduled time.")) return;
+          await actionRun(() => api("schedule_delete", {
+            user_id: button.dataset.scheduleDelete, reason: reason.reason,
+            reason_code: reason.reason_code, delete_at: date.toISOString()
+          }), "Deletion scheduled. The account is suspended now and will be automatically deleted at the scheduled time.");
         }));
       } else if (activeTab === "identities") {
         const data = await api("users", { page: 1, status: "all" });
