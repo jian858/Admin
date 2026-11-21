@@ -34,8 +34,8 @@
     { code: "other", label: "Other" }
   ];
   function askRestrictionReason(title) {
-    const choices = RESTRICTION_REASONS.map((item, index) => (index + 1) + ". " + item.label).join("\\n");
-    const choice = prompt(title + "\\n\\n" + choices + "\\n\\nEnter a number from 1 to 10:", "10");
+    const choices = RESTRICTION_REASONS.map((item, index) => (index + 1) + ". " + item.label).join("\n");
+    const choice = prompt(title + "\n\n" + choices + "\n\nEnter a number from 1 to 10:", "10");
     if (choice === null) return null;
     const selected = RESTRICTION_REASONS[Number(choice.trim()) - 1];
     if (!selected) { notice("Choose one of the ten listed reasons."); return null; }
