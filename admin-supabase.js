@@ -82,6 +82,7 @@
           <button class="sa-tab" data-tab="announcements" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><path d="m3 11 18-5v12L3 13z"/><path d="m7 14 2 7h5l-3-6"/></svg></span>Announcements</button>
           <button class="sa-tab" data-tab="errors" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><path d="M12 3 2.8 19h18.4L12 3Z"/><path d="M12 9v4m0 3h.01"/></svg></span>Errors</button>
           <button class="sa-tab" data-tab="system" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4M7 9h3m4 0h3m-10 4h10"/></svg></span>System</button>
+          <button class="sa-tab" data-tab="visitors" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M2.5 20c0-3.5 2.8-5.5 6.5-5.5s6.5 2 6.5 5.5M16 14c3 0 5.5 1.8 5.5 4.5"/></svg></span>Visitors</button>
           <button class="sa-tab" data-tab="activity" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>Activity</button>
         </nav></div>
         <div id="saNotice" class="sa-message" hidden role="status"></div>
@@ -302,6 +303,26 @@
           '</tbody></table></div></section>' +
           '<section class="sa-panel"><h2>Active restrictions (' + restrictions.length + ')</h2><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Account</th><th>Status</th><th>Reason</th><th>Starts</th><th>Ends / scheduled deletion</th></tr></thead><tbody>' +
           (restrictions.length ? restrictions.map((item) => '<tr><td>' + escapeHtml(item.user_id) + '</td><td><span class="sa-status">' + escapeHtml(item.status) + '</span></td><td>' + escapeHtml(item.reason || item.reason_code || "—") + '</td><td>' + escapeHtml(dateLabel(item.starts_at || item.created_at)) + '</td><td>' + escapeHtml(dateLabel(item.scheduled_delete_at || item.ends_at)) + '</td></tr>').join("") : '<tr><td colspan="5">No active restrictions found.</td></tr>') +
+          '</tbody></table></div></section>';
+      } else if (activeTab === "visitors") {
+        const data = await api("visitor_analytics");
+        const daily = data.daily || [];
+        const pages = data.pages || [];
+        const recent = data.recent || [];
+        content.innerHTML = '<div class="sa-section-heading"><div><span class="sa-kicker">AUDIENCE ANALYTICS</span><h1>Visitors</h1><p>Anonymous website visits, including people who have not registered or logged in.</p></div><span class="sa-live"><i></i> Guest tracking active</span></div>' +
+          '<div class="sa-grid">' +
+          [['Total visits', data.total_visits], ['Unique visitors (sample)', data.unique_visitors_sample], ['Visits today (sample)', data.visits_today_sample], ['Visitors today (sample)', data.unique_visitors_today_sample]].map(([label, value]) =>
+            '<article class="sa-card"><div class="sa-card-top"><span class="sa-muted">' + escapeHtml(label) + '</span><span class="sa-card-dot"></span></div><div class="sa-number">' + Number(value || 0).toLocaleString() + '</div><div class="sa-card-foot">Recorded anonymous IDs</div></article>'
+          ).join('') + '</div>' +
+          (data.sample_limited ? '<p class="sa-muted">Unique visitor and daily/page figures are based on the latest 5,000 events. Total visits is exact.</p>' : '') +
+          '<section class="sa-panel"><h2>Visits by day</h2><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Date</th><th>Visits</th><th>Unique visitors</th></tr></thead><tbody>' +
+          (daily.length ? daily.map(item => '<tr><td>' + escapeHtml(item.date) + '</td><td>' + Number(item.visits).toLocaleString() + '</td><td>' + Number(item.visitors).toLocaleString() + '</td></tr>').join('') : '<tr><td colspan="3">No visits recorded yet.</td></tr>') +
+          '</tbody></table></div></section>' +
+          '<section class="sa-panel"><h2>Most visited pages</h2><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Page</th><th>Visits</th></tr></thead><tbody>' +
+          (pages.length ? pages.map(item => '<tr><td>' + escapeHtml(item.path) + '</td><td>' + Number(item.visits).toLocaleString() + '</td></tr>').join('') : '<tr><td colspan="2">No page visits recorded yet.</td></tr>') +
+          '</tbody></table></div></section>' +
+          '<section class="sa-panel"><h2>Latest visits</h2><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Page</th><th>Anonymous visitor ID</th><th>Time</th></tr></thead><tbody>' +
+          (recent.length ? recent.map(item => '<tr><td>' + escapeHtml(item.page_path) + '</td><td><code>' + escapeHtml(item.visitor_id) + '</code></td><td>' + escapeHtml(dateLabel(item.visited_at)) + '</td></tr>').join('') : '<tr><td colspan="3">No visits recorded yet.</td></tr>') +
           '</tbody></table></div></section>';
       } else if (activeTab === "activity") {
         const data = await api("activity");
