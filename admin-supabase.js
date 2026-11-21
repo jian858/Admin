@@ -311,10 +311,10 @@
         const recent = data.recent || [];
         content.innerHTML = '<div class="sa-section-heading"><div><span class="sa-kicker">AUDIENCE ANALYTICS</span><h1>Visitors</h1><p>Anonymous website visits, including people who have not registered or logged in.</p></div><span class="sa-live"><i></i> Guest tracking active</span></div>' +
           '<div class="sa-grid">' +
-          [['Total visits', data.total_visits], ['Unique visitors (sample)', data.unique_visitors_sample], ['Visits today (sample)', data.visits_today_sample], ['Visitors today (sample)', data.unique_visitors_today_sample]].map(([label, value]) =>
+          [['Unique devices', data.unique_visitors], ['Raw page visits', data.total_visits], ['New devices today', data.unique_visitors_today], ['Page visits today', data.visits_today_sample]].map(([label, value]) =>
             '<article class="sa-card"><div class="sa-card-top"><span class="sa-muted">' + escapeHtml(label) + '</span><span class="sa-card-dot"></span></div><div class="sa-number">' + Number(value || 0).toLocaleString() + '</div><div class="sa-card-foot">Recorded anonymous IDs</div></article>'
           ).join('') + '</div>' +
-          (data.sample_limited ? '<p class="sa-muted">Unique visitor and daily/page figures are based on the latest 5,000 events. Total visits is exact.</p>' : '') +
+          (data.sample_limited ? '<p class="sa-muted">Daily and page-visit details are based on the latest 5,000 events. Unique device total is exact.</p>' : '') +
           '<section class="sa-panel"><h2>Visits by day</h2><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Date</th><th>Visits</th><th>Unique visitors</th></tr></thead><tbody>' +
           (daily.length ? daily.map(item => '<tr><td>' + escapeHtml(item.date) + '</td><td>' + Number(item.visits).toLocaleString() + '</td><td>' + Number(item.visitors).toLocaleString() + '</td></tr>').join('') : '<tr><td colspan="3">No visits recorded yet.</td></tr>') +
           '</tbody></table></div></section>' +
