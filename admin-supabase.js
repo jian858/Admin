@@ -57,7 +57,7 @@
     errorBox.hidden = !message;
   }
 
-  const READ_ACTIONS = new Set(["overview", "users", "blocked_users", "reports", "posts", "appeals", "announcements", "visitor_analytics", "errors", "system", "activity"]);
+  const READ_ACTIONS = new Set(["overview", "users", "blocked_users", "reports", "posts", "appeals", "announcements", "notifications", "visitor_analytics", "errors", "system", "activity"]);
   const responseCache = new Map();
   const pendingRequests = new Map();
   const CACHE_TTL_MS = 8000;
