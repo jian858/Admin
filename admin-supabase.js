@@ -68,7 +68,7 @@
     errorBox.hidden = !message;
   }
 
-  const READ_ACTIONS = new Set(["overview", "users", "blocked_users", "reports", "posts", "appeals", "verified_requests", "announcements", "notifications", "visitor_analytics", "errors", "system", "activity"]);
+  const READ_ACTIONS = new Set(["overview", "users", "blocked_users", "moderation_cases", "reports", "posts", "appeals", "verified_requests", "announcements", "notifications", "visitor_analytics", "errors", "system", "activity"]);
   const responseCache = new Map();
   const pendingRequests = new Map();
   const CACHE_TTL_MS = 8000;
@@ -135,7 +135,7 @@
         </header><nav class="sa-tabs" aria-label="Admin sections">
           <button class="sa-tab" data-tab="overview" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="5" rx="2"/><rect x="13" y="10" width="8" height="11" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/></svg></span>Overview</button>
           <button class="sa-tab" data-tab="users" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17" cy="9" r="2.6"/><path d="M17 14c2.8 0 4.7 1.8 4.7 4.5"/></svg></span>Users</button>
-          <button class="sa-tab" data-tab="blocks" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m6 6 12 12"/></svg></span>Blocked users</button>
+          <button class="sa-tab" data-tab="blocks" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m6 6 12 12"/></svg></span>Blocked users</button>\n          <button class="sa-tab" data-tab="moderation" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><path d="M12 3 3 7v5c0 5 4 8 9 9 5-1 9-4 9-9V7z"/><path d="m8 12 2.5 2.5L16 9"/></svg></span>Moderation</button>
           <button class="sa-tab" data-tab="identities" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><circle cx="7" cy="12" r="3"/><circle cx="17" cy="12" r="3"/><path d="M10 12h4"/></svg></span>Account IDs</button>
           <button class="sa-tab" data-tab="reports" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></span>Reports</button>
           <button class="sa-tab" data-tab="posts" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span>Posts</button>
@@ -241,7 +241,7 @@
         const data = await api("users", { page: usersPage, q: usersQuery, status: usersStatus });
         content.innerHTML = '<section class="sa-panel"><div class="sa-toolbar"><h2>Users</h2><form id="saUserSearch" class="sa-actions"><input class="sa-search" id="saSearch" type="search" value="' + escapeHtml(usersQuery) + '" placeholder="Search username, name or ID" aria-label="Search users"><select class="sa-search" id="saUserStatus" aria-label="Filter account status"><option value="all">All accounts</option><option value="active">Active</option><option value="suspended">Suspended</option></select><button class="sa-btn primary" type="submit">Search</button></form></div><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Account / username</th><th>Created</th><th>Status</th><th>Action</th></tr></thead><tbody>' +
           (data.users || []).map((user) => '<tr data-user-row="' + escapeHtml(user.id) + '"><td><strong>' + (user.username ? "@" + escapeHtml(user.username) : "Username not set") + '</strong><div class="sa-muted">' + escapeHtml(user.display_name || "Unnamed account") + '</div><div class="sa-muted">Supabase ID: ' + escapeHtml(user.id) + '</div><div class="sa-muted">Murmur ID: ' + escapeHtml(user.public_id || "—") + '</div>' + (user.is_verified ? '<span class="sa-status" style="margin-top:5px;display:inline-flex">Verified by Murmur</span>' : '') + '</td><td>' + escapeHtml(dateLabel(user.created_at)) + '</td><td><span class="sa-status">' + (user.is_terminated ? "Terminated" : (user.is_banned ? "Banned" : (user.is_suspended ? "Suspended" : "Active"))) + '</span>' + (user.suspension_reason ? '<div class="sa-muted">' + escapeHtml(user.suspension_reason) + '</div>' : '') + '</td><td><div class="sa-cell-actions">' +
-          (user.is_terminated ? '<span class="sa-muted">Permanently disabled</span>' : ((user.is_verified ? '<button class="sa-btn sa-small" data-unverify="' + escapeHtml(user.id) + '">Remove verified badge</button>' : '<button class="sa-btn primary sa-small" data-verify="' + escapeHtml(user.id) + '">Give verified badge</button>') + (user.is_suspended ? '<button class="sa-btn sa-small" data-unsuspend="' + escapeHtml(user.id) + '">Restore</button>' : '<button class="sa-btn danger sa-small" data-suspend="' + escapeHtml(user.id) + '">Suspend</button>') + (user.is_banned ? '<button class="sa-btn sa-small" data-unban="' + escapeHtml(user.id) + '">Unban</button>' : '<button class="sa-btn danger sa-small" data-ban="' + escapeHtml(user.id) + '">Ban</button>') + '<button class="sa-btn danger sa-small" data-schedule-delete="' + escapeHtml(user.id) + '">Schedule deletion</button><button class="sa-btn danger sa-small" data-terminate-user="' + escapeHtml(user.id) + '">Terminate account</button>')) +
+          (user.is_terminated ? '<span class="sa-muted">Permanently disabled</span>' : ((user.is_verified ? '<button class="sa-btn sa-small" data-unverify="' + escapeHtml(user.id) + '">Remove verified badge</button>' : '<button class="sa-btn primary sa-small" data-verify="' + escapeHtml(user.id) + '">Give verified badge</button>') + (user.is_suspended ? '<button class="sa-btn sa-small" data-unsuspend="' + escapeHtml(user.id) + '">Restore</button>' : '<button class="sa-btn danger sa-small" data-suspend="' + escapeHtml(user.id) + '">Suspend</button>') + (user.is_banned ? '<button class="sa-btn sa-small" data-unban="' + escapeHtml(user.id) + '">Unban</button>' : '<button class="sa-btn danger sa-small" data-ban="' + escapeHtml(user.id) + '">Ban</button>') + '<button class="sa-btn sa-small" data-warning="' + escapeHtml(user.id) + '">Warning</button><button class="sa-btn sa-small" data-mute="' + escapeHtml(user.id) + '">Mute</button><button class="sa-btn danger sa-small" data-schedule-delete="' + escapeHtml(user.id) + '">Schedule deletion</button><button class="sa-btn danger sa-small" data-terminate-user="' + escapeHtml(user.id) + '">Terminate account</button>')) +
           '</div></td></tr>').join("") + '</tbody></table></div></section>';
         content.innerHTML += '<div class="sa-toolbar" style="justify-content:flex-end;align-items:center;margin-top:12px"><span class="sa-muted">Page ' + data.page + ' of ' + data.total_pages + ' · ' + Number(data.total).toLocaleString() + ' accounts</span><button class="sa-btn sa-small" id="saUsersPrev" type="button"' + (data.page <= 1 ? ' disabled' : '') + '>Previous</button><button class="sa-btn sa-small" id="saUsersNext" type="button"' + (data.page >= data.total_pages ? ' disabled' : '') + '>Next</button></div>';
         content.querySelector("#saUserStatus").value = usersStatus;
@@ -303,6 +303,22 @@
             user_id: button.dataset.scheduleDelete, reason: reason.reason,
             reason_code: reason.reason_code, delete_at: date.toISOString()
           }), "Deletion scheduled. The system generated the note and date automatically.");
+        }));
+        content.querySelectorAll("[data-warning]").forEach(button => button.addEventListener("click", async () => {
+          const reason = askRestrictionReason("Choose the reason for issuing a warning:");
+          if (!reason) return;
+          await actionRun(() => api("moderate_user", {
+            user_id: button.dataset.warning, type: "warning", reason: reason.reason,
+            reason_code: reason.reason_code, appealable: true
+          }), "Warning issued and saved as a moderation case.");
+        }));
+        content.querySelectorAll("[data-mute]").forEach(button => button.addEventListener("click", async () => {
+          const reason = askRestrictionReason("Choose the reason for muting this account:");
+          if (!reason) return;
+          await actionRun(() => api("moderate_user", {
+            user_id: button.dataset.mute, type: "mute", reason: reason.reason,
+            reason_code: reason.reason_code, duration_hours: reason.duration_hours, appealable: true
+          }), "Mute issued and saved as a moderation case.");
         }));
       } else if (activeTab === "blocks") {
         const data = await api("blocked_users");
@@ -395,14 +411,34 @@
             }
           });
         }));
+      } else if (activeTab === "moderation") {
+        const data = await api("moderation_cases");
+        const cases = data.cases || [];
+        content.innerHTML = '<div class="sa-section-heading"><div><span class="sa-kicker">TRUST & SAFETY</span><h1>Moderation cases</h1><p>Review warnings, mutes, suspensions, bans and terminations.</p></div></div><section class="sa-panel"><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Case ID / account</th><th>Action</th><th>Reason</th><th>Issued</th><th>Expiry</th><th>Status</th><th></th></tr></thead><tbody>' +
+          (cases.length ? cases.map(item => '<tr><td><strong>' + escapeHtml(item.id) + '</strong><div class="sa-muted">' + escapeHtml(item.profile?.username ? '@' + item.profile.username : item.profile?.display_name || item.user_id) + '</div><div class="sa-muted">' + escapeHtml(item.user_id) + '</div></td><td><span class="sa-status">' + escapeHtml(item.type) + '</span></td><td>' + escapeHtml(item.reason) + '</td><td>' + escapeHtml(dateLabel(item.created_at)) + '</td><td>' + escapeHtml(dateLabel(item.expires_at)) + '</td><td>' + (item.revoked_at ? 'Lifted' : (item.expires_at && new Date(item.expires_at).getTime() <= Date.now() ? 'Expired' : 'Active')) + '</td><td>' + (!item.revoked_at && (!item.expires_at || new Date(item.expires_at).getTime() > Date.now()) ? '<button class="sa-btn sa-small" data-lift-case="' + escapeHtml(item.id) + '">Lift action</button>' : '—') + '</td></tr>').join('') : '<tr><td colspan="7">No moderation cases yet.</td></tr>') +
+          '</tbody></table></div></section>';
+        content.querySelectorAll("[data-lift-case]").forEach(button => button.addEventListener("click", async () => {
+          if (!confirm("Lift this moderation action? The account will be restored only if no other active restriction remains.")) return;
+          await actionRun(() => api("lift_moderation_case", { case_id: button.dataset.liftCase }), "Moderation action lifted.");
+        }));
       } else if (activeTab === "appeals") {
         const data = await api("appeals");
-        content.innerHTML = '<section class="sa-panel"><h2>Account appeals</h2><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Appeal</th><th>Account</th><th>Submitted</th><th>Status</th><th>Review</th></tr></thead><tbody>' +
-          (data.appeals || []).map((appeal) => '<tr><td>' + escapeHtml(appeal.message) + '<div class="sa-muted">' + escapeHtml(appeal.id) + '</div></td><td>' + escapeHtml(appeal.user_id) + '</td><td>' + escapeHtml(dateLabel(appeal.created_at)) + '</td><td><span class="sa-status">' + escapeHtml(appeal.status) + '</span></td><td><button class="sa-btn sa-small" data-review-appeal="' + escapeHtml(appeal.id) + '" data-status="reviewing">Review</button> <button class="sa-btn sa-small" data-review-appeal="' + escapeHtml(appeal.id) + '" data-status="approved">Approve</button> <button class="sa-btn danger sa-small" data-review-appeal="' + escapeHtml(appeal.id) + '" data-status="rejected">Reject</button></td></tr>').join("") + '</tbody></table></div></section>';
+        const moderationAppeals = data.moderation_appeals || [];
+        content.innerHTML = '<section class="sa-panel"><h2>Account appeals</h2><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Appeal / case</th><th>Account</th><th>Submitted</th><th>Status</th><th>Review</th></tr></thead><tbody>' +
+          (data.appeals || []).map((appeal) => '<tr><td>' + escapeHtml(appeal.message) + '<div class="sa-muted">' + escapeHtml(appeal.id) + '</div></td><td>' + escapeHtml(appeal.user_id) + '</td><td>' + escapeHtml(dateLabel(appeal.created_at)) + '</td><td><span class="sa-status">' + escapeHtml(appeal.status) + '</span></td><td><button class="sa-btn sa-small" data-review-appeal="' + escapeHtml(appeal.id) + '" data-status="reviewing">Review</button> <button class="sa-btn sa-small" data-review-appeal="' + escapeHtml(appeal.id) + '" data-status="approved">Approve</button> <button class="sa-btn danger sa-small" data-review-appeal="' + escapeHtml(appeal.id) + '" data-status="rejected">Reject</button></td></tr>').join("") +
+          moderationAppeals.map(appeal => '<tr><td>' + escapeHtml(appeal.message) + '<div class="sa-muted">Case: ' + escapeHtml(appeal.action_id) + '</div><div class="sa-muted">' + escapeHtml(appeal.id) + '</div></td><td>' + escapeHtml(appeal.user_id) + '</td><td>' + escapeHtml(dateLabel(appeal.created_at)) + '</td><td><span class="sa-status">' + escapeHtml(appeal.status) + '</span></td><td>' + (appeal.status === 'pending' ? '<button class="sa-btn sa-small" data-review-mod-appeal="' + escapeHtml(appeal.id) + '" data-status="approved">Approve</button> <button class="sa-btn danger sa-small" data-review-mod-appeal="' + escapeHtml(appeal.id) + '" data-status="denied">Deny</button>' : escapeHtml(appeal.reviewer_note || 'Reviewed')) + '</td></tr>').join("") +
+          '</tbody></table></div></section>';
         content.querySelectorAll("[data-review-appeal]").forEach((button) => button.addEventListener("click", async () => {
           const response = prompt("Optional response to the user:", "");
           if (response === null) return;
           await actionRun(() => api("update_appeal", { appeal_id: button.dataset.reviewAppeal, status: button.dataset.status, admin_response: response }), "Appeal updated.");
+        }));
+        content.querySelectorAll("[data-review-mod-appeal]").forEach(button => button.addEventListener("click", async () => {
+          const note = prompt("Optional reviewer note:", "");
+          if (note === null) return;
+          await actionRun(() => api("review_moderation_appeal", {
+            appeal_id: button.dataset.reviewModAppeal, status: button.dataset.status, reviewer_note: note
+          }), "Moderation appeal reviewed.");
         }));
       } else if (activeTab === "verified_requests") {
         const data = await api("verified_requests");
