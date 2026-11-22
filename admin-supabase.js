@@ -129,6 +129,7 @@
           <button class="sa-tab" data-tab="reports" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></span>Reports</button>
           <button class="sa-tab" data-tab="posts" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span>Posts</button>
           <button class="sa-tab" data-tab="appeals" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><path d="m12 3 8 9-8 9-8-9z"/><path d="M12 8v5m0 3h.01"/></svg></span>Appeals</button>
+          <button class="sa-tab" data-tab="notifications" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></span>Notifications</button>
           <button class="sa-tab" data-tab="announcements" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><path d="m3 11 18-5v12L3 13z"/><path d="m7 14 2 7h5l-3-6"/></svg></span>Announcements</button>
           <button class="sa-tab" data-tab="errors" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><path d="M12 3 2.8 19h18.4L12 3Z"/><path d="M12 9v4m0 3h.01"/></svg></span>Errors</button>
           <button class="sa-tab" data-tab="system" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4M7 9h3m4 0h3m-10 4h10"/></svg></span>System</button>
@@ -227,8 +228,8 @@
       } else if (activeTab === "users") {
         const data = await api("users", { page: usersPage, q: usersQuery, status: usersStatus });
         content.innerHTML = '<section class="sa-panel"><div class="sa-toolbar"><h2>Users</h2><form id="saUserSearch" class="sa-actions"><input class="sa-search" id="saSearch" type="search" value="' + escapeHtml(usersQuery) + '" placeholder="Search username, name or ID" aria-label="Search users"><select class="sa-search" id="saUserStatus" aria-label="Filter account status"><option value="all">All accounts</option><option value="active">Active</option><option value="suspended">Suspended</option></select><button class="sa-btn primary" type="submit">Search</button></form></div><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Account / username</th><th>Created</th><th>Status</th><th>Action</th></tr></thead><tbody>' +
-          (data.users || []).map((user) => '<tr data-user-row="' + escapeHtml(user.id) + '"><td><strong>' + (user.username ? "@" + escapeHtml(user.username) : "Username not set") + '</strong><div class="sa-muted">' + escapeHtml(user.display_name || "Unnamed account") + '</div><div class="sa-muted">Supabase ID: ' + escapeHtml(user.id) + '</div><div class="sa-muted">Murmur ID: ' + escapeHtml(user.public_id || "—") + '</div></td><td>' + escapeHtml(dateLabel(user.created_at)) + '</td><td><span class="sa-status">' + (!user.has_profile ? "Profile setup incomplete" : (user.is_suspended ? "Suspended" : "Active")) + '</span>' + (user.suspension_reason ? '<div class="sa-muted">' + escapeHtml(user.suspension_reason) + '</div>' : '') + '</td><td><div class="sa-cell-actions">' +
-          (!user.has_profile ? '<span class="sa-muted">Profile required before account actions</span>' : (user.is_suspended ? '<button class="sa-btn sa-small" data-unsuspend="' + escapeHtml(user.id) + '">Restore</button>' : '<button class="sa-btn danger sa-small" data-suspend="' + escapeHtml(user.id) + '">Suspend</button><button class="sa-btn danger sa-small" data-schedule-delete="' + escapeHtml(user.id) + '">Schedule deletion</button>')) +
+          (data.users || []).map((user) => '<tr data-user-row="' + escapeHtml(user.id) + '"><td><strong>' + (user.username ? "@" + escapeHtml(user.username) : "Username not set") + '</strong><div class="sa-muted">' + escapeHtml(user.display_name || "Unnamed account") + '</div><div class="sa-muted">Supabase ID: ' + escapeHtml(user.id) + '</div><div class="sa-muted">Murmur ID: ' + escapeHtml(user.public_id || "—") + '</div></td><td>' + escapeHtml(dateLabel(user.created_at)) + '</td><td><span class="sa-status">' + (user.is_banned ? "Banned" : (user.is_suspended ? "Suspended" : "Active")) + '</span>' + (user.suspension_reason ? '<div class="sa-muted">' + escapeHtml(user.suspension_reason) + '</div>' : '') + '</td><td><div class="sa-cell-actions">' +
+          (user.is_suspended ? '<button class="sa-btn sa-small" data-unsuspend="' + escapeHtml(user.id) + '">Restore</button>' : '<button class="sa-btn danger sa-small" data-suspend="' + escapeHtml(user.id) + '">Suspend</button>') + (user.is_banned ? '<button class="sa-btn sa-small" data-unban="' + escapeHtml(user.id) + '">Unban</button>' : '<button class="sa-btn danger sa-small" data-ban="' + escapeHtml(user.id) + '">Ban</button>') + '<button class="sa-btn danger sa-small" data-schedule-delete="' + escapeHtml(user.id) + '">Schedule deletion</button><button class="sa-btn danger sa-small" data-terminate-user="' + escapeHtml(user.id) + '">Terminate / delete</button>' +
           '</div></td></tr>').join("") + '</tbody></table></div></section>';
         content.innerHTML += '<div class="sa-toolbar" style="justify-content:flex-end;align-items:center;margin-top:12px"><span class="sa-muted">Page ' + data.page + ' of ' + data.total_pages + ' · ' + Number(data.total).toLocaleString() + ' accounts</span><button class="sa-btn sa-small" id="saUsersPrev" type="button"' + (data.page <= 1 ? ' disabled' : '') + '>Previous</button><button class="sa-btn sa-small" id="saUsersNext" type="button"' + (data.page >= data.total_pages ? ' disabled' : '') + '>Next</button></div>';
         content.querySelector("#saUserStatus").value = usersStatus;
@@ -258,6 +259,24 @@
             user_id: button.dataset.suspend, suspended: true,
             reason: reason.reason, reason_code: reason.reason_code, duration_hours: hours
           }), "Account suspended.");
+        }));
+        content.querySelectorAll("[data-ban]").forEach((button) => button.addEventListener("click", async () => {
+          const reason = askRestrictionReason("Choose the reason for banning this account:");
+          if (!reason) return;
+          const duration = prompt("Ban duration in hours (1–876000; 876000 = 100 years):", "876000");
+          if (duration === null) return;
+          const hours = Number(duration.trim());
+          if (!Number.isFinite(hours) || hours <= 0 || hours > 876000) { notice("Choose a duration between 1 and 876000 hours."); return; }
+          await actionRun(() => api("ban_user", { user_id: button.dataset.ban, duration_hours: hours, reason: reason.reason, reason_code: reason.reason_code }), "Account banned.");
+        }));
+        content.querySelectorAll("[data-unban]").forEach((button) => button.addEventListener("click", async () => {
+          if (!confirm("Remove the ban from this account?")) return;
+          await actionRun(() => api("unban_user", { user_id: button.dataset.unban }), "Account ban removed.");
+        }));
+        content.querySelectorAll("[data-terminate-user]").forEach((button) => button.addEventListener("click", async () => {
+          const confirmation = prompt("Permanently terminate and delete this account? This cannot be undone. Type DELETE to continue:");
+          if (confirmation !== "DELETE") return;
+          await actionRun(() => api("delete_user", { user_id: button.dataset.terminateUser, confirm: "DELETE" }), "Account permanently deleted.");
         }));
         content.querySelectorAll("[data-unsuspend]").forEach((button) => button.addEventListener("click", async () => {
           await actionRun(() => api("set_user_status", { user_id: button.dataset.unsuspend, suspended: false }), "Account restored.");
@@ -374,6 +393,16 @@
           const response = prompt("Optional response to the user:", "");
           if (response === null) return;
           await actionRun(() => api("update_appeal", { appeal_id: button.dataset.reviewAppeal, status: button.dataset.status, admin_response: response }), "Appeal updated.");
+        }));
+      } else if (activeTab === "notifications") {
+        const data = await api("notifications");
+        const items = data.notifications || [];
+        content.innerHTML = '<div class="sa-section-heading"><div><span class="sa-kicker">MODERATION</span><h1>User notifications</h1><p>Review and delete individual notifications delivered to Murmur accounts.</p></div></div><section class="sa-panel"><div class="sa-toolbar"><h2>Recent notifications (' + items.length + ')</h2><span class="sa-muted">Latest 200</span></div><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Recipient</th><th>Notification</th><th>Date / status</th><th>Action</th></tr></thead><tbody>' +
+          (items.length ? items.map(item => '<tr><td><strong>' + escapeHtml(item.recipient?.username ? '@' + item.recipient.username : item.recipient?.display_name || item.recipient_id) + '</strong><div class="sa-muted">' + escapeHtml(item.recipient_id) + '</div></td><td><strong>' + escapeHtml((item.kind || "notification").replace(/[_-]/g, " ")) + '</strong><div class="sa-muted">' + escapeHtml(item.content || "") + '</div></td><td>' + escapeHtml(dateLabel(item.created_at)) + '<div class="sa-muted">' + (item.read_at ? "Read" : "Unread") + '</div></td><td><button class="sa-btn danger sa-small" data-delete-notification="' + escapeHtml(item.id) + '">Delete</button></td></tr>').join("") : '<tr><td colspan="4">No notifications found.</td></tr>') +
+          '</tbody></table></div></section>';
+        content.querySelectorAll("[data-delete-notification]").forEach(button => button.addEventListener("click", async () => {
+          if (!confirm("Permanently delete this notification for its recipient?")) return;
+          await actionRun(() => api("delete_notification", { notification_id: button.dataset.deleteNotification }), "Notification deleted.");
         }));
       } else if (activeTab === "announcements") {
         const data = await api("announcements");
