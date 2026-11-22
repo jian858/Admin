@@ -57,7 +57,7 @@
     errorBox.hidden = !message;
   }
 
-  const READ_ACTIONS = new Set(["overview", "users", "blocked_users", "reports", "posts", "appeals", "announcements", "notifications", "visitor_analytics", "errors", "system", "activity"]);
+  const READ_ACTIONS = new Set(["overview", "users", "blocked_users", "reports", "posts", "appeals", "verified_requests", "announcements", "notifications", "visitor_analytics", "errors", "system", "activity"]);
   const responseCache = new Map();
   const pendingRequests = new Map();
   const CACHE_TTL_MS = 8000;
@@ -129,6 +129,7 @@
           <button class="sa-tab" data-tab="reports" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></span>Reports</button>
           <button class="sa-tab" data-tab="posts" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span>Posts</button>
           <button class="sa-tab" data-tab="appeals" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><path d="m12 3 8 9-8 9-8-9z"/><path d="M12 8v5m0 3h.01"/></svg></span>Appeals</button>
+          <button class="sa-tab" data-tab="verified_requests" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><path d="m12 2 2.4 6.1L21 10l-6.6 1.9L12 18l-2.4-6.1L3 10l6.6-1.9L12 2Z"/></svg></span>Badge requests</button>
           <button class="sa-tab" data-tab="notifications" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"/></svg></span>Notifications</button>
           <button class="sa-tab" data-tab="announcements" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><path d="m3 11 18-5v12L3 13z"/><path d="m7 14 2 7h5l-3-6"/></svg></span>Announcements</button>
           <button class="sa-tab" data-tab="errors" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><path d="M12 3 2.8 19h18.4L12 3Z"/><path d="M12 9v4m0 3h.01"/></svg></span>Errors</button>
@@ -401,6 +402,20 @@
           const response = prompt("Optional response to the user:", "");
           if (response === null) return;
           await actionRun(() => api("update_appeal", { appeal_id: button.dataset.reviewAppeal, status: button.dataset.status, admin_response: response }), "Appeal updated.");
+        }));
+      } else if (activeTab === "verified_requests") {
+        const data = await api("verified_requests");
+        const requests = data.requests || [];
+        content.innerHTML = '<div class="sa-section-heading"><div><span class="sa-kicker">COMMUNITY TRUST</span><h1>Verified badge requests</h1><p>Review account verification submissions and approve or decline each request.</p></div></div><section class="sa-panel"><div class="sa-toolbar"><h2>Requests (' + requests.length + ')</h2></div><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Account</th><th>Reason / evidence</th><th>Submitted</th><th>Status</th><th>Decision</th></tr></thead><tbody>' +
+          (requests.length ? requests.map(item => '<tr><td><strong>' + escapeHtml(item.profile?.username ? '@' + item.profile.username : item.profile?.display_name || 'Murmur user') + '</strong><div class="sa-muted">' + escapeHtml(item.user_id) + '</div></td><td>' + escapeHtml(item.reason) + (item.evidence_url ? '<div><a href="' + escapeHtml(item.evidence_url) + '" target="_blank" rel="noopener noreferrer">Open public link</a></div>' : '') + (item.reviewer_note ? '<div class="sa-muted">Previous note: ' + escapeHtml(item.reviewer_note) + '</div>' : '') + '</td><td>' + escapeHtml(dateLabel(item.created_at)) + '</td><td><span class="sa-status">' + escapeHtml(item.status) + '</span></td><td>' + (item.status === 'pending' ? '<button class="sa-btn primary sa-small" data-verified-review="' + escapeHtml(item.id) + '" data-status="approved">Approve &amp; verify</button> <button class="sa-btn danger sa-small" data-verified-review="' + escapeHtml(item.id) + '" data-status="rejected">Decline</button>' : '<span class="sa-muted">Reviewed</span>') + '</td></tr>').join('') : '<tr><td colspan="5">No verified badge requests yet.</td></tr>') +
+          '</tbody></table></div></section>';
+        content.querySelectorAll("[data-verified-review]").forEach(button => button.addEventListener("click", async () => {
+          const note = prompt(button.dataset.status === "approved" ? "Optional note to the user:" : "Reason for declining this request:", "");
+          if (note === null) return;
+          if (button.dataset.status === "rejected" && !note.trim()) { notice("Add a short reason before declining."); return; }
+          await actionRun(() => api("review_verified_request", { request_id: button.dataset.verifiedReview, status: button.dataset.status, reviewer_note: note }), button.dataset.status === "approved" ? "Badge request approved and account verified." : "Badge request declined.");
+          responseCache.delete("verified_requests:{}");
+          if (activeTab === "verified_requests") loadTab();
         }));
       } else if (activeTab === "notifications") {
         const data = await api("notifications");
