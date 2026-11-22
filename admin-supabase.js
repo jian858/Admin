@@ -282,7 +282,8 @@
         const data = await api("posts");
         content.innerHTML = '<section class="sa-panel"><h2>Posts</h2><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Post</th><th>Author</th><th>Visibility</th><th>Created</th><th>Action</th></tr></thead><tbody>' +
           (data.posts || []).map((post) => '<tr><td>' + escapeHtml(post.content || (post.media_type || "Media post")) + '<div class="sa-muted">' + escapeHtml(post.id) + '</div></td><td>' + escapeHtml(post.author_id) + '</td><td>' + escapeHtml(post.visibility || "—") + '</td><td>' + escapeHtml(dateLabel(post.created_at)) + '</td><td><button class="sa-btn danger sa-small" data-delete-post="' + escapeHtml(post.id) + '">Delete</button></td></tr>').join("") + '</tbody></table></div></section>';
-        content.querySelectorAll("[data-delete-post]").forEach((button) => button.addEventListener("click", async () => {
+        content.querySelectorAll("[data-delete-post]").forEach((button) => button.addEventListener("click", () => {
+          content.querySelector("#saPostRemovalReason")?.remove();
           const reasons = [
             ["spam", "Spam or misleading content"],
             ["harassment", "Harassment or bullying"],
@@ -295,15 +296,38 @@
             ["copyright", "Copyright or intellectual property violation"],
             ["other", "Other Community Guidelines violation"]
           ];
-          const choice = window.prompt("Select the removal reason by number:\n" + reasons.map((item, index) => (index + 1) + ". " + item[1]).join("\n") + "\n\nThe notification sent to the user is generated automatically and cannot be edited.", "1");
-          if (choice === null) return;
-          const index = Number(choice) - 1;
-          if (!Number.isInteger(index) || index < 0 || index >= reasons.length) {
-            notice("Choose a valid reason number from 1 to 10.", "error");
-            return;
-          }
-          if (!confirm("Delete this post and send the fixed removal notification to its author?\nReason: " + reasons[index][1])) return;
-          await actionRun(() => api("delete_post", { post_id: button.dataset.deletePost, reason_code: reasons[index][0] }), "Post deleted and the author was notified.");
+          const panel = document.createElement("section");
+          panel.id = "saPostRemovalReason";
+          panel.className = "sa-panel";
+          panel.style.cssText = "margin:16px 0;padding:20px;border:2px solid var(--sa-accent,#64748b);border-radius:14px;background:var(--sa-card,#fff);color:var(--sa-text,#111);";
+          panel.innerHTML = '<h2 style="margin:0 0 8px">Choose one of the approved post-removal reasons</h2><p class="sa-muted" style="margin:0 0 14px">Select the reason Murmur will send to the post author. The notification text is generated automatically and cannot be edited.</p><label for="saPostRemovalReasonSelect" style="display:block;font-weight:600;margin-bottom:8px">Post removal reason</label><select id="saPostRemovalReasonSelect" class="sa-search" style="display:block;width:100%;max-width:none;margin:0 0 14px;padding:12px;min-height:46px"><option value="">Select an approved reason…</option>' +
+            reasons.map((item) => '<option value="' + item[0] + '">' + escapeHtml(item[1]) + '</option>').join("") +
+            '</select><div class="sa-actions"><button class="sa-btn primary" type="button" id="saConfirmPostRemoval">Continue</button><button class="sa-btn" type="button" id="saCancelPostRemoval">Cancel</button></div>';
+          content.prepend(panel);
+          panel.scrollIntoView({ behavior: "smooth", block: "center" });
+          panel.querySelector("#saPostRemovalReasonSelect").focus();
+          panel.querySelector("#saCancelPostRemoval").addEventListener("click", () => panel.remove());
+          panel.querySelector("#saConfirmPostRemoval").addEventListener("click", async () => {
+            const code = panel.querySelector("#saPostRemovalReasonSelect").value;
+            const selected = reasons.find((item) => item[0] === code);
+            if (!selected) {
+              notice("Choose one of the approved post-removal reasons.", "error");
+              panel.querySelector("#saPostRemovalReasonSelect").focus();
+              return;
+            }
+            if (!confirm("Delete this post and send the fixed removal notification to its author?\nReason: " + selected[1])) return;
+            const confirmButton = panel.querySelector("#saConfirmPostRemoval");
+            confirmButton.disabled = true;
+            confirmButton.textContent = "Deleting…";
+            try {
+              await actionRun(() => api("delete_post", { post_id: button.dataset.deletePost, reason_code: code }), "Post deleted and the author was notified.");
+              panel.remove();
+            } catch (error) {
+              confirmButton.disabled = false;
+              confirmButton.textContent = "Continue";
+              throw error;
+            }
+          });
         }));
       } else if (activeTab === "appeals") {
         const data = await api("appeals");
