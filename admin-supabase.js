@@ -320,12 +320,20 @@
             confirmButton.disabled = true;
             confirmButton.textContent = "Deleting…";
             try {
-              await actionRun(() => api("delete_post", { post_id: button.dataset.deletePost, reason_code: code }), "Post deleted and the author was notified.");
+              const result = await api("delete_post", {
+                post_id: button.dataset.deletePost,
+                reason_code: code
+              });
+              if (!result || result.ok !== true) {
+                throw new Error("The server did not confirm that the post was deleted.");
+              }
               panel.remove();
+              notice("Post deleted and the author was notified.");
+              await loadTab();
             } catch (error) {
               confirmButton.disabled = false;
               confirmButton.textContent = "Continue";
-              throw error;
+              notice(error.message || "Post deletion failed.");
             }
           });
         }));
