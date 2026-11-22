@@ -310,7 +310,6 @@
           (data.posts || []).map((post) => '<tr><td>' + escapeHtml(post.content || (post.media_type || "Media post")) + '<div class="sa-muted">' + escapeHtml(post.id) + '</div></td><td>' + escapeHtml(post.author_id) + '</td><td>' + escapeHtml(post.visibility || "—") + '</td><td>' + escapeHtml(dateLabel(post.created_at)) + '</td><td><button class="sa-btn danger sa-small" data-delete-post="' + escapeHtml(post.id) + '">Delete</button></td></tr>').join("") + '</tbody></table></div></section>';
         content.querySelectorAll("[data-delete-post]").forEach((button) => button.addEventListener("click", (event) => {
           event.preventDefault();
-          button.disabled = true;
           content.querySelector("#saPostRemovalReason")?.remove();
           const reasons = [
             ["spam", "Spam or misleading content"],
@@ -483,6 +482,7 @@
     const button = document.getElementById("saRefresh");
     button.disabled = true;
     try {
+      clearResponseCache();
       const data = await api("refresh");
       if (!data || !data.allowed) {
         const seconds = Number(data && data.retry_after_seconds || 0);
