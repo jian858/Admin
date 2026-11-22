@@ -283,8 +283,27 @@
         content.innerHTML = '<section class="sa-panel"><h2>Posts</h2><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Post</th><th>Author</th><th>Visibility</th><th>Created</th><th>Action</th></tr></thead><tbody>' +
           (data.posts || []).map((post) => '<tr><td>' + escapeHtml(post.content || (post.media_type || "Media post")) + '<div class="sa-muted">' + escapeHtml(post.id) + '</div></td><td>' + escapeHtml(post.author_id) + '</td><td>' + escapeHtml(post.visibility || "—") + '</td><td>' + escapeHtml(dateLabel(post.created_at)) + '</td><td><button class="sa-btn danger sa-small" data-delete-post="' + escapeHtml(post.id) + '">Delete</button></td></tr>').join("") + '</tbody></table></div></section>';
         content.querySelectorAll("[data-delete-post]").forEach((button) => button.addEventListener("click", async () => {
-          if (!confirm("Permanently delete this post?")) return;
-          await actionRun(() => api("delete_post", { post_id: button.dataset.deletePost }), "Post deleted.");
+          const reasons = [
+            ["spam", "Spam or misleading content"],
+            ["harassment", "Harassment or bullying"],
+            ["hate_speech", "Hateful or discriminatory content"],
+            ["impersonation", "Impersonation"],
+            ["fraud", "Fraud or scams"],
+            ["sexual_content", "Sexual or explicit content"],
+            ["violence", "Violence or threats"],
+            ["child_safety", "Child safety concern"],
+            ["copyright", "Copyright or intellectual property violation"],
+            ["other", "Other Community Guidelines violation"]
+          ];
+          const choice = window.prompt("Select the removal reason by number:\n" + reasons.map((item, index) => (index + 1) + ". " + item[1]).join("\n") + "\n\nThe notification sent to the user is generated automatically and cannot be edited.", "1");
+          if (choice === null) return;
+          const index = Number(choice) - 1;
+          if (!Number.isInteger(index) || index < 0 || index >= reasons.length) {
+            notice("Choose a valid reason number from 1 to 10.", "error");
+            return;
+          }
+          if (!confirm("Delete this post and send the fixed removal notification to its author?\nReason: " + reasons[index][1])) return;
+          await actionRun(() => api("delete_post", { post_id: button.dataset.deletePost, reason_code: reasons[index][0] }), "Post deleted and the author was notified.");
         }));
       } else if (activeTab === "appeals") {
         const data = await api("appeals");
