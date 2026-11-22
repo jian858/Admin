@@ -282,9 +282,9 @@
           await actionRun(() => api("unban_user", { user_id: button.dataset.unban }), "Account ban removed.");
         }));
         content.querySelectorAll("[data-terminate-user]").forEach((button) => button.addEventListener("click", async () => {
-          const confirmation = prompt("Permanently terminate and delete this account? This cannot be undone. Type DELETE to continue:");
+          const confirmation = prompt("Permanently terminate this account? Sign-in will be disabled and account records will be retained for audit. Type DELETE to continue:");
           if (confirmation !== "DELETE") return;
-          await actionRun(() => api("delete_user", { user_id: button.dataset.terminateUser, confirm: "DELETE" }), "Account permanently deleted.");
+          await actionRun(() => api("delete_user", { user_id: button.dataset.terminateUser, confirm: "DELETE" }), "Account terminated. Sign-in is disabled; records are retained for audit.");
         }));
         content.querySelectorAll("[data-unsuspend]").forEach((button) => button.addEventListener("click", async () => {
           await actionRun(() => api("set_user_status", { user_id: button.dataset.unsuspend, suspended: false }), "Account restored.");
