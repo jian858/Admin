@@ -271,15 +271,16 @@
         content.querySelectorAll("[data-suspend]").forEach((button) => button.addEventListener("click", async () => {
           const reason = askRestrictionReason("Choose the reason for suspending this account:");
           if (!reason) return;
-          await actionRun(() => api("set_user_status", {
-            user_id: button.dataset.suspend, suspended: true,
-            reason: reason.reason, reason_code: reason.reason_code, duration_hours: Math.min(reason.duration_hours, 8760)
+          await actionRun(() => api("moderate_user", {
+            user_id: button.dataset.suspend, type: "suspension",
+            reason: reason.reason, reason_code: reason.reason_code,
+            duration_hours: Math.min(reason.duration_hours, 8760), appealable: true
           }), "Account suspended. The system generated the notice and expiry automatically.");
         }));
         content.querySelectorAll("[data-ban]").forEach((button) => button.addEventListener("click", async () => {
           const reason = askRestrictionReason("Choose the reason for banning this account:");
           if (!reason) return;
-          await actionRun(() => api("ban_user", { user_id: button.dataset.ban, duration_hours: reason.duration_hours, reason: reason.reason, reason_code: reason.reason_code }), "Account banned. The system generated the notice and expiry automatically.");
+          await actionRun(() => api("moderate_user", { user_id: button.dataset.ban, type: "ban", duration_hours: reason.duration_hours, reason: reason.reason, reason_code: reason.reason_code, appealable: true }), "Account banned. The system generated the notice and expiry automatically.");
         }));
         content.querySelectorAll("[data-unban]").forEach((button) => button.addEventListener("click", async () => {
           if (!confirm("Remove the ban from this account?")) return;
@@ -289,7 +290,7 @@
           const reason = askRestrictionReason("Choose the reason for permanently terminating this account:");
           if (!reason) return;
           if (!confirm("Permanently terminate this account for: " + reason.reason + "? Sign-in will be disabled immediately. Account records will be retained in the database for audit.")) return;
-          await actionRun(() => api("delete_user", { user_id: button.dataset.terminateUser, confirm: "DELETE", reason_code: reason.reason_code }), "Account terminated. The reason and account status are saved in the database; sign-in is disabled.");
+          await actionRun(() => api("moderate_user", { user_id: button.dataset.terminateUser, type: "termination", reason: reason.reason, reason_code: reason.reason_code, appealable: false }), "Account terminated. The reason and account status are saved in the database; sign-in is disabled.");
         }));
         content.querySelectorAll("[data-unsuspend]").forEach((button) => button.addEventListener("click", async () => {
           await actionRun(() => api("set_user_status", { user_id: button.dataset.unsuspend, suspended: false }), "Account restored.");
