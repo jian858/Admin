@@ -33,15 +33,26 @@
     { code: "repeated_violations", label: "Repeated policy violations" },
     { code: "other", label: "Other" }
   ];
+  const RESTRICTION_POLICY = {
+    spam: { hours: 24, deletionDays: 7, note: "Automated enforcement: spam or fake engagement." },
+    harassment: { hours: 72, deletionDays: 14, note: "Automated enforcement: harassment or bullying." },
+    hate_speech: { hours: 168, deletionDays: 30, note: "Automated enforcement: hate speech or discriminatory content." },
+    impersonation: { hours: 168, deletionDays: 14, note: "Automated enforcement: impersonation." },
+    fraud: { hours: 720, deletionDays: 7, note: "Automated enforcement: scams or fraud." },
+    sexual_content: { hours: 168, deletionDays: 14, note: "Automated enforcement: prohibited sexual or explicit content." },
+    violence: { hours: 720, deletionDays: 7, note: "Automated enforcement: violence or threats." },
+    child_safety: { hours: 876000, deletionDays: 1, note: "Automated enforcement: child safety concern; immediate permanent restriction." },
+    repeated_violations: { hours: 720, deletionDays: 7, note: "Automated enforcement: repeated policy violations." },
+    other: { hours: 24, deletionDays: 30, note: "Automated enforcement: other policy violation." }
+  };
   function askRestrictionReason(title) {
-    const choices = RESTRICTION_REASONS.map((item, index) => (index + 1) + ". " + item.label).join("\n");
-    const choice = prompt(title + "\n\n" + choices + "\n\nEnter a number from 1 to 10:", "10");
+    const choices = RESTRICTION_REASONS.map((item, index) => (index + 1) + ". " + item.label).join("\\n");
+    const choice = prompt(title + "\\n\\n" + choices + "\\n\\nEnter a number from 1 to 10:", "1");
     if (choice === null) return null;
     const selected = RESTRICTION_REASONS[Number(choice.trim()) - 1];
     if (!selected) { notice("Choose one of the ten listed reasons."); return null; }
-    const details = prompt("Add details for the selected reason:");
-    if (!details || !details.trim()) { notice("Reason details are required."); return null; }
-    return { reason_code: selected.code, reason: (selected.label + ": " + details.trim()).slice(0, 500) };
+    const policy = RESTRICTION_POLICY[selected.code];
+    return { reason_code: selected.code, reason: policy.note, duration_hours: policy.hours, delete_at: new Date(Date.now() + policy.deletionDays * 86400000).toISOString(), policy };
   }
   let activeTab = "overview";
   let usersPage = 1;
@@ -260,32 +271,25 @@
         content.querySelectorAll("[data-suspend]").forEach((button) => button.addEventListener("click", async () => {
           const reason = askRestrictionReason("Choose the reason for suspending this account:");
           if (!reason) return;
-          const duration = prompt("Suspension duration in hours (1–8760):", "24");
-          if (duration === null) return;
-          const hours = Number(duration.trim());
-          if (!Number.isFinite(hours) || hours <= 0 || hours > 8760) { notice("Choose a duration between 1 and 8760 hours."); return; }
           await actionRun(() => api("set_user_status", {
             user_id: button.dataset.suspend, suspended: true,
-            reason: reason.reason, reason_code: reason.reason_code, duration_hours: hours
-          }), "Account suspended.");
+            reason: reason.reason, reason_code: reason.reason_code, duration_hours: Math.min(reason.duration_hours, 8760)
+          }), "Account suspended. The system generated the notice and expiry automatically.");
         }));
         content.querySelectorAll("[data-ban]").forEach((button) => button.addEventListener("click", async () => {
           const reason = askRestrictionReason("Choose the reason for banning this account:");
           if (!reason) return;
-          const duration = prompt("Ban duration in hours (1–876000; 876000 = 100 years):", "876000");
-          if (duration === null) return;
-          const hours = Number(duration.trim());
-          if (!Number.isFinite(hours) || hours <= 0 || hours > 876000) { notice("Choose a duration between 1 and 876000 hours."); return; }
-          await actionRun(() => api("ban_user", { user_id: button.dataset.ban, duration_hours: hours, reason: reason.reason, reason_code: reason.reason_code }), "Account banned.");
+          await actionRun(() => api("ban_user", { user_id: button.dataset.ban, duration_hours: reason.duration_hours, reason: reason.reason, reason_code: reason.reason_code }), "Account banned. The system generated the notice and expiry automatically.");
         }));
         content.querySelectorAll("[data-unban]").forEach((button) => button.addEventListener("click", async () => {
           if (!confirm("Remove the ban from this account?")) return;
           await actionRun(() => api("unban_user", { user_id: button.dataset.unban }), "Account ban removed.");
         }));
         content.querySelectorAll("[data-terminate-user]").forEach((button) => button.addEventListener("click", async () => {
-          const confirmation = prompt("Permanently terminate this account? Sign-in will be disabled and account records will be retained for audit. Type DELETE to continue:");
-          if (confirmation !== "DELETE") return;
-          await actionRun(() => api("delete_user", { user_id: button.dataset.terminateUser, confirm: "DELETE" }), "Account terminated. Sign-in is disabled; records are retained for audit.");
+          const reason = askRestrictionReason("Choose the reason for permanently terminating this account:");
+          if (!reason) return;
+          if (!confirm("Permanently terminate this account for: " + reason.reason + "? Sign-in will be disabled immediately. Account records will be retained in the database for audit.")) return;
+          await actionRun(() => api("delete_user", { user_id: button.dataset.terminateUser, confirm: "DELETE", reason_code: reason.reason_code }), "Account terminated. The reason and account status are saved in the database; sign-in is disabled.");
         }));
         content.querySelectorAll("[data-unsuspend]").forEach((button) => button.addEventListener("click", async () => {
           await actionRun(() => api("set_user_status", { user_id: button.dataset.unsuspend, suspended: false }), "Account restored.");
@@ -293,15 +297,12 @@
         content.querySelectorAll("[data-schedule-delete]").forEach((button) => button.addEventListener("click", async () => {
           const reason = askRestrictionReason("Choose the reason for scheduling account deletion:");
           if (!reason) return;
-          const when = prompt("Enter the deletion date and time (example: 2026-12-01T09:00):");
-          if (!when) return;
-          const date = new Date(when);
-          if (!Number.isFinite(date.getTime()) || date.getTime() <= Date.now()) { notice("Choose a valid future date and time."); return; }
-          if (!confirm("Schedule this account for deletion? The account will be suspended immediately and automatically deleted at the scheduled time.")) return;
+          const date = new Date(reason.delete_at);
+          if (!confirm("Schedule account deletion for " + date.toLocaleString() + "? The system selected this date based on the reason. The account is suspended immediately.")) return;
           await actionRun(() => api("schedule_delete", {
             user_id: button.dataset.scheduleDelete, reason: reason.reason,
             reason_code: reason.reason_code, delete_at: date.toISOString()
-          }), "Deletion scheduled. The account is suspended now and will be automatically deleted at the scheduled time.");
+          }), "Deletion scheduled. The system generated the note and date automatically.");
         }));
       } else if (activeTab === "blocks") {
         const data = await api("blocked_users");
