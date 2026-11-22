@@ -98,6 +98,7 @@
         </header><nav class="sa-tabs" aria-label="Admin sections">
           <button class="sa-tab" data-tab="overview" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="5" rx="2"/><rect x="13" y="10" width="8" height="11" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/></svg></span>Overview</button>
           <button class="sa-tab" data-tab="users" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17" cy="9" r="2.6"/><path d="M17 14c2.8 0 4.7 1.8 4.7 4.5"/></svg></span>Users</button>
+          <button class="sa-tab" data-tab="blocks" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="m6 6 12 12"/></svg></span>Blocked users</button>
           <button class="sa-tab" data-tab="identities" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><circle cx="7" cy="12" r="3"/><circle cx="17" cy="12" r="3"/><path d="M10 12h4"/></svg></span>Account IDs</button>
           <button class="sa-tab" data-tab="reports" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-4-4"/></svg></span>Reports</button>
           <button class="sa-tab" data-tab="posts" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="2"/><path d="M8 8h8M8 12h8M8 16h5"/></svg></span>Posts</button>
@@ -247,6 +248,17 @@
             user_id: button.dataset.scheduleDelete, reason: reason.reason,
             reason_code: reason.reason_code, delete_at: date.toISOString()
           }), "Deletion scheduled. The account is suspended now and will be automatically deleted at the scheduled time.");
+        }));
+      } else if (activeTab === "blocks") {
+        const data = await api("blocked_users");
+        const rows = data.blocks || [];
+        content.innerHTML = '<div class="sa-section-heading"><div><span class="sa-kicker">SAFETY & MODERATION</span><h1>Blocked users</h1><p>Review user-to-user blocks. Removing a block restores the ability to find or contact one another where other privacy rules allow.</p></div></div>' +
+          '<section class="sa-panel"><div class="sa-toolbar"><h2>Active blocks (' + rows.length + ')</h2><span class="sa-muted">Private admin view</span></div><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Blocked by</th><th>Blocked account</th><th>Date</th><th>Action</th></tr></thead><tbody>' +
+          (rows.length ? rows.map(item => '<tr><td><strong>' + escapeHtml(item.blocker?.username ? '@' + item.blocker.username : item.blocker?.display_name || item.blocker_id) + '</strong><div class="sa-muted">' + escapeHtml(item.blocker_id) + '</div></td><td><strong>' + escapeHtml(item.blocked?.username ? '@' + item.blocked.username : item.blocked?.display_name || item.blocked_id) + '</strong><div class="sa-muted">' + escapeHtml(item.blocked_id) + '</div></td><td>' + escapeHtml(dateLabel(item.created_at)) + '</td><td><button class="sa-btn danger sa-small" data-remove-block="' + escapeHtml(item.blocker_id) + '" data-blocked-id="' + escapeHtml(item.blocked_id) + '">Remove block</button></td></tr>').join('') : '<tr><td colspan="4">No active blocks found.</td></tr>') +
+          '</tbody></table></div></section>';
+        content.querySelectorAll("[data-remove-block]").forEach(button => button.addEventListener("click", async () => {
+          if (!confirm("Remove this block? This does not recreate a friendship or restore a conversation automatically.")) return;
+          await actionRun(() => api("remove_block", { blocker_id: button.dataset.removeBlock, blocked_id: button.dataset.blockedId }), "Block removed.");
         }));
       } else if (activeTab === "identities") {
         const data = await api("users", { page: 1, status: "all" });
