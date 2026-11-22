@@ -57,25 +57,51 @@
     errorBox.hidden = !message;
   }
 
+  const READ_ACTIONS = new Set(["overview", "users", "blocked_users", "reports", "posts", "appeals", "announcements", "visitor_analytics", "errors", "system", "activity"]);
+  const responseCache = new Map();
+  const pendingRequests = new Map();
+  const CACHE_TTL_MS = 8000;
+
+  function clearResponseCache() {
+    responseCache.clear();
+  }
+
   async function api(action, payload) {
-    const { data: sessionData, error: sessionError } = await client.auth.getSession();
-    if (sessionError || !sessionData.session) throw new Error("Your session expired. Sign in again.");
-    const response = await fetch(FUNCTION_URL, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "apikey": SUPABASE_KEY,
-        "Authorization": "Bearer " + sessionData.session.access_token
-      },
-      body: JSON.stringify({ action, ...(payload || {}) })
-    });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      const failure = new Error(result.error || "Admin request failed (" + response.status + ").");
-      failure.status = response.status;
-      throw failure;
+    const cacheable = READ_ACTIONS.has(action);
+    const cacheKey = action + ":" + JSON.stringify(payload || {});
+    if (cacheable) {
+      const cached = responseCache.get(cacheKey);
+      if (cached && Date.now() - cached.time < CACHE_TTL_MS) return cached.value;
+      if (pendingRequests.has(cacheKey)) return pendingRequests.get(cacheKey);
     }
-    return result;
+    const request = (async () => {
+      const { data: sessionData, error: sessionError } = await client.auth.getSession();
+      if (sessionError || !sessionData.session) throw new Error("Your session expired. Sign in again.");
+      const response = await fetch(FUNCTION_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPABASE_KEY,
+          "Authorization": "Bearer " + sessionData.session.access_token
+        },
+        body: JSON.stringify({ action, ...(payload || {}) })
+      });
+      const result = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        const failure = new Error(result.error || "Admin request failed (" + response.status + ").");
+        failure.status = response.status;
+        throw failure;
+      }
+      if (cacheable) responseCache.set(cacheKey, { time: Date.now(), value: result });
+      else clearResponseCache();
+      return result;
+    })();
+    if (cacheable) pendingRequests.set(cacheKey, request);
+    try {
+      return await request;
+    } finally {
+      if (cacheable && pendingRequests.get(cacheKey) === request) pendingRequests.delete(cacheKey);
+    }
   }
 
   function showShell() {
@@ -282,7 +308,9 @@
         const data = await api("posts");
         content.innerHTML = '<section class="sa-panel"><h2>Posts</h2><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Post</th><th>Author</th><th>Visibility</th><th>Created</th><th>Action</th></tr></thead><tbody>' +
           (data.posts || []).map((post) => '<tr><td>' + escapeHtml(post.content || (post.media_type || "Media post")) + '<div class="sa-muted">' + escapeHtml(post.id) + '</div></td><td>' + escapeHtml(post.author_id) + '</td><td>' + escapeHtml(post.visibility || "—") + '</td><td>' + escapeHtml(dateLabel(post.created_at)) + '</td><td><button class="sa-btn danger sa-small" data-delete-post="' + escapeHtml(post.id) + '">Delete</button></td></tr>').join("") + '</tbody></table></div></section>';
-        content.querySelectorAll("[data-delete-post]").forEach((button) => button.addEventListener("click", () => {
+        content.querySelectorAll("[data-delete-post]").forEach((button) => button.addEventListener("click", (event) => {
+          event.preventDefault();
+          button.disabled = true;
           content.querySelector("#saPostRemovalReason")?.remove();
           const reasons = [
             ["spam", "Spam or misleading content"],
@@ -303,15 +331,15 @@
           panel.innerHTML = '<h2 style="margin:0 0 8px">Choose one of the approved post-removal reasons</h2><p class="sa-muted" style="margin:0 0 14px">Select the reason Murmur will send to the post author. The notification text is generated automatically and cannot be edited.</p><label for="saPostRemovalReasonSelect" style="display:block;font-weight:600;margin-bottom:8px">Post removal reason</label><select id="saPostRemovalReasonSelect" class="sa-search" style="display:block;width:100%;max-width:none;margin:0 0 14px;padding:12px;min-height:46px"><option value="">Select an approved reason…</option>' +
             reasons.map((item) => '<option value="' + item[0] + '">' + escapeHtml(item[1]) + '</option>').join("") +
             '</select><div class="sa-actions"><button class="sa-btn primary" type="button" id="saConfirmPostRemoval">Continue</button><button class="sa-btn" type="button" id="saCancelPostRemoval">Cancel</button></div>';
-          content.prepend(panel);
+          host.prepend(panel);
           panel.scrollIntoView({ behavior: "smooth", block: "center" });
           panel.querySelector("#saPostRemovalReasonSelect").focus();
-          panel.querySelector("#saCancelPostRemoval").addEventListener("click", () => panel.remove());
+          panel.querySelector("#saCancelPostRemoval").addEventListener("click", () => { panel.remove(); button.disabled = false; });
           panel.querySelector("#saConfirmPostRemoval").addEventListener("click", async () => {
             const code = panel.querySelector("#saPostRemovalReasonSelect").value;
             const selected = reasons.find((item) => item[0] === code);
             if (!selected) {
-              notice("Choose one of the approved post-removal reasons.", "error");
+              notice("Choose one of the approved post-removal reasons.");
               panel.querySelector("#saPostRemovalReasonSelect").focus();
               return;
             }
@@ -328,11 +356,13 @@
                 throw new Error("The server did not confirm that the post was deleted.");
               }
               panel.remove();
+              button.closest("tr")?.remove();
               notice("Post deleted and the author was notified.");
               await loadTab();
             } catch (error) {
               confirmButton.disabled = false;
               confirmButton.textContent = "Continue";
+              button.disabled = false;
               notice(error.message || "Post deletion failed.");
             }
           });
