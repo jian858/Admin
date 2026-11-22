@@ -31,11 +31,13 @@ jobs:
           node --input-type=module <<'NODE'
           import { readFileSync, existsSync } from 'node:fs';
           const html = readFileSync('index.html', 'utf8');
-          const ids = [...html.matchAll(/\\bid=["']([^"']+)["']/g)].map((match) => match[1]);
+          const ids = [...html.matchAll(/id=["']([^"']+)["']/g)].map((match) => match[1]);
           const duplicates = ids.filter((id, index) => ids.indexOf(id) !== index);
           if (duplicates.length) throw new Error('Duplicate HTML IDs: ' + [...new Set(duplicates)].join(', '));
-          for (const match of html.matchAll(/(?:src|href)=["'](\\.\\/[^"']+)["']/g)) {
-            const path = match[1].split(/[?#]/, 1)[0];
+          for (const match of html.matchAll(/(?:src|href)=["']([^"']+)["']/g)) {
+            const raw = match[1];
+            if (!raw.startsWith('./')) continue;
+            const path = raw.split(/[?#]/, 1)[0];
             if (!existsSync(path)) throw new Error('Missing local asset: ' + path);
           }
           console.log('Admin HTML assets and IDs are valid.');
