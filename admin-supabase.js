@@ -512,11 +512,23 @@
         const daily = data.daily || [];
         const pages = data.pages || [];
         const recent = data.recent || [];
+        const classification = data.visitor_classification || {};
+        const classificationCards = [
+          ["Likely human", classification.likely_human, "Recognized browser signature"],
+          ["Suspected bots", classification.suspected_bot, "Crawler or automation signature"],
+          ["Unknown", classification.unknown, "Not enough browser evidence"]
+        ];
+        const classificationLabel = (type) => type === "likely_human" ? "Likely human" :
+          (type === "suspected_bot" ? "Suspected bot" : "Unknown");
         content.innerHTML = '<div class="sa-section-heading"><div><span class="sa-kicker">AUDIENCE ANALYTICS</span><h1>Visitors</h1><p>Anonymous website visits, including people who have not registered or logged in.</p></div><span class="sa-live is-live" id="saVisitorLiveStatus"><i></i> Live updates connected</span></div>' +
           '<div class="sa-grid">' +
           [['Unique devices', data.unique_visitors], ['Raw page visits', data.total_visits], ['New devices today', data.unique_visitors_today], ['Page visits today', data.visits_today_sample]].map(([label, value]) =>
             '<article class="sa-card"><div class="sa-card-top"><span class="sa-muted">' + escapeHtml(label) + '</span><span class="sa-card-dot"></span></div><div class="sa-number">' + Number(value || 0).toLocaleString() + '</div><div class="sa-card-foot">Recorded anonymous IDs</div></article>'
           ).join('') + '</div>' +
+          '<section class="sa-panel"><h2>Human and bot detection</h2><p class="sa-muted">Classification uses browser and automation signatures. “Likely human” does not prove a real person; browser headers can be spoofed.</p><div class="sa-grid">' +
+          classificationCards.map(([label, value, note]) =>
+            '<article class="sa-card"><div class="sa-card-top"><span class="sa-muted">' + escapeHtml(label) + '</span><span class="sa-card-dot"></span></div><div class="sa-number">' + Number(value || 0).toLocaleString() + '</div><div class="sa-card-foot">' + escapeHtml(note) + '</div></article>'
+          ).join('') + '</div></section>' +
           (data.sample_limited ? '<p class="sa-muted">Daily and page-visit details are based on the latest 5,000 events. Unique device total is exact.</p>' : '') +
           '<section class="sa-panel"><h2>Visits by day</h2><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Date</th><th>Visits</th><th>Unique visitors</th></tr></thead><tbody>' +
           (daily.length ? daily.map(item => '<tr><td>' + escapeHtml(item.date) + '</td><td>' + Number(item.visits).toLocaleString() + '</td><td>' + Number(item.visitors).toLocaleString() + '</td></tr>').join('') : '<tr><td colspan="3">No visits recorded yet.</td></tr>') +
@@ -524,8 +536,8 @@
           '<section class="sa-panel"><h2>Most visited pages</h2><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Page</th><th>Visits</th></tr></thead><tbody>' +
           (pages.length ? pages.map(item => '<tr><td>' + escapeHtml(item.path) + '</td><td>' + Number(item.visits).toLocaleString() + '</td></tr>').join('') : '<tr><td colspan="2">No page visits recorded yet.</td></tr>') +
           '</tbody></table></div></section>' +
-          '<section class="sa-panel"><div class="sa-toolbar"><h2>Latest visits</h2><span class="sa-muted" id="saVisitorLastUpdated">Updated just now</span></div><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Page</th><th>Anonymous visitor ID</th><th>Time</th></tr></thead><tbody>' +
-          (recent.length ? recent.map(item => '<tr><td>' + escapeHtml(item.page_path) + '</td><td><code>' + escapeHtml(item.visitor_id) + '</code></td><td>' + escapeHtml(dateLabel(item.visited_at)) + '</td></tr>').join('') : '<tr><td colspan="3">No visits recorded yet.</td></tr>') +
+          '<section class="sa-panel"><div class="sa-toolbar"><h2>Latest visits</h2><span class="sa-muted" id="saVisitorLastUpdated">Updated just now</span></div><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Page</th><th>Visitor ID</th><th>Classification</th><th>Detection signal</th><th>Time</th></tr></thead><tbody>' +
+          (recent.length ? recent.map(item => '<tr><td>' + escapeHtml(item.page_path) + '</td><td><code>' + escapeHtml(item.visitor_id) + '</code></td><td><span class="sa-status">' + escapeHtml(classificationLabel(item.visitor_type)) + '</span></td><td>' + escapeHtml(item.detection_reason || "No signal recorded") + '</td><td>' + escapeHtml(dateLabel(item.visited_at)) + '</td></tr>').join('') : '<tr><td colspan="5">No visits recorded yet.</td></tr>') +
           '</tbody></table></div></section>' +
           '<section class="sa-panel"><h2>Phone IDs and duplicate accounts</h2><p class="sa-muted">Device links are stored in Supabase. Each linked account shows its Supabase UUID and Murmur public ID; multiple accounts linked to one device are flagged as duplicates.</p><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Device label</th><th>Phone code</th><th>Accounts on device</th><th>Account IDs</th><th>Last seen</th></tr></thead><tbody>' +
           ((data.phone_devices || []).length ? data.phone_devices.map(item => '<tr><td>' + (item.duplicate_phone ? '<span class="sa-status">' + escapeHtml(item.admin_label) + '</span>' : escapeHtml(item.admin_label)) + '</td><td><code>' + escapeHtml(item.phone_code || '') + '</code></td><td>' + Number(item.linked_accounts || 0) + '</td><td>' + ((item.accounts || []).map(account => '<div><code>' + escapeHtml(account.supabase_id) + '</code><br><small>Murmur ID: ' + escapeHtml(account.murmur_id || '—') + '</small></div>').join('<hr>') || 'No registered accounts') + '</td><td>' + escapeHtml(dateLabel(item.last_seen_at)) + '</td></tr>').join('') : '<tr><td colspan="5">No registered phone/account links yet. Accounts will appear after signing in.</td></tr>') +
