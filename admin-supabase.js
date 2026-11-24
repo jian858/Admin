@@ -271,9 +271,22 @@
       if (activeTab === "admins") {
         const data = await api("admins");
         const roleOptions = (data.roles || []).map((role) => '<option value="' + escapeHtml(role.role) + '">' + escapeHtml(role.label) + ' · Stage ' + role.stage + '</option>').join("");
-        content.innerHTML = '<section class="sa-panel"><h2>Administrator access</h2><p>Only the Super God Admin can appoint, promote, demote, or disable administrators. Access changes are enforced by the server on every request.</p><form id="saAdminAdd" class="sa-toolbar" style="margin-top:14px"><input class="sa-search" id="saAdminEmail" type="email" placeholder="Registered Supabase account email" required aria-label="Registered Supabase account email"><select class="sa-search" id="saAdminRole" aria-label="Administrator stage">' + roleOptions + '</select><button class="sa-btn primary" type="submit">Appoint admin</button></form><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Administrator</th><th>Stage</th><th>Status</th><th>Change access</th></tr></thead><tbody>' +
+        content.innerHTML = '<section class="sa-panel"><h2>Administrator access</h2><p>Only the Super God Admin can appoint, promote, demote, or disable administrators. Access changes are enforced by the server on every request.</p><form id="saAdminAdd" class="sa-toolbar" style="margin-top:14px"><input class="sa-search" id="saAdminEmail" type="email" placeholder="Account email" required aria-label="Account email"><select class="sa-search" id="saAdminRole" aria-label="Administrator stage">' + roleOptions + '</select><input class="sa-search" id="saAdminPassword" type="password" minlength="12" maxlength="128" autocomplete="new-password" placeholder="New password (12+ characters)" aria-label="New administrator password"><button class="sa-btn primary" id="saAdminCreate" type="button">Create admin account</button><button class="sa-btn" type="submit">Appoint existing account</button></form><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Administrator</th><th>Stage</th><th>Status</th><th>Change access</th></tr></thead><tbody>' +
         (data.admins || []).map((item) => '<tr><td><strong>' + escapeHtml(item.email) + '</strong><div class="sa-muted">' + escapeHtml(item.user_id) + '</div></td><td>' + escapeHtml(item.role.replace(/_/g, " ")) + '</td><td><span class="sa-status">' + (item.enabled ? "Enabled" : "Disabled") + '</span></td><td>' + (item.user_id === adminSession.admin.id ? '<span class="sa-muted">Your root account is protected</span>' : '<div class="sa-cell-actions"><select class="sa-search sa-admin-role" data-admin-email="' + escapeHtml(item.email) + '" aria-label="Change stage for ' + escapeHtml(item.email) + '">' + roleOptions.replace('value="' + escapeHtml(item.role) + '"', 'value="' + escapeHtml(item.role) + '" selected') + '</select><button class="sa-btn primary sa-small" data-admin-save="' + escapeHtml(item.email) + '">Save</button><button class="sa-btn danger sa-small" data-admin-enabled="' + escapeHtml(item.email) + '" data-enabled="' + String(item.enabled) + '">' + (item.enabled ? "Disable" : "Enable") + '</button></div>') + '</td></tr>').join("") +
         '</tbody></table></div></section>';
+        content.querySelector("#saAdminCreate").addEventListener("click", async () => {
+          const email = content.querySelector("#saAdminEmail").value.trim();
+          const role = content.querySelector("#saAdminRole").value;
+          const password = content.querySelector("#saAdminPassword").value;
+          if (!email || password.length < 12) { notice("Enter an email and a new password with at least 12 characters."); return; }
+          if (!confirm("Create a new Supabase login and assign " + role.replace(/_/g, " ") + " access to " + email + "?")) return;
+          try {
+            await api("create_admin", { email, role, password });
+            content.querySelector("#saAdminPassword").value = "";
+            notice("Admin account created. The new admin must confirm their email before signing in.");
+            await loadTab();
+          } catch (error) { notice(error.message || "Could not create the admin account."); }
+        });
         content.querySelector("#saAdminAdd").addEventListener("submit", async (event) => {
           event.preventDefault();
           const email = content.querySelector("#saAdminEmail").value.trim();
