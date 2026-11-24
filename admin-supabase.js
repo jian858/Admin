@@ -178,7 +178,7 @@
     root.querySelector("#saTheme").addEventListener("click", toggleTheme);
     loadTab();
     if (window.MurmurErrors) window.MurmurErrors.flush();
-    startVisitorLiveUpdates();
+    if ((adminSession.allowed_tabs || []).includes("visitors")) startVisitorLiveUpdates();
   }
 
   async function startVisitorLiveUpdates() {
