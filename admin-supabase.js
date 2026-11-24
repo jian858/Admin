@@ -62,6 +62,7 @@
   let loadId = 0;
   let visitorChannel = null;
   let visitorReloadTimer = null;
+  let permissionRefreshTimer = null;
   let visitorRealtimeStatus = "connecting";
 
   function setError(message) {
@@ -179,6 +180,8 @@
     loadTab();
     if (window.MurmurErrors) window.MurmurErrors.flush();
     if ((adminSession.allowed_tabs || []).includes("visitors")) startVisitorLiveUpdates();
+    if (permissionRefreshTimer) clearInterval(permissionRefreshTimer);
+    permissionRefreshTimer = setInterval(() => refreshAdminPermissions(), 30000);
   }
 
   async function startVisitorLiveUpdates() {
@@ -238,6 +241,24 @@
       button.setAttribute("aria-current", String(active));
       button.classList.toggle("is-active", active);
     });
+  }
+
+  async function refreshAdminPermissions() {
+    try {
+      clearResponseCache();
+      const previousRole = adminSession && adminSession.admin && adminSession.admin.role;
+      adminSession = await api("session");
+      document.querySelectorAll("[data-tab]").forEach((button) => {
+        button.hidden = !(adminSession.allowed_tabs || []).includes(button.dataset.tab);
+      });
+      const roleBadge = document.getElementById("saRoleBadge");
+      if (roleBadge) roleBadge.textContent = (adminSession.admin.role_label || adminSession.admin.role).toUpperCase();
+      if (!(adminSession.allowed_tabs || []).includes(activeTab)) activeTab = "overview";
+      updateTabs();
+      if (previousRole !== adminSession.admin.role || !document.querySelector('[data-tab="' + CSS.escape(activeTab) + '"]')) loadTab();
+    } catch (error) {
+      if (error.status === 401 || error.status === 403) await signOut();
+    }
   }
 
   async function loadTab() {
@@ -640,6 +661,7 @@
   }
 
   async function signOut() {
+    if (permissionRefreshTimer) { clearInterval(permissionRefreshTimer); permissionRefreshTimer = null; }
     await stopVisitorLiveUpdates();
     await client.auth.signOut();
     const root = document.getElementById("supabaseAdmin");
