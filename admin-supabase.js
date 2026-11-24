@@ -270,7 +270,8 @@
     try {
       if (activeTab === "admins") {
         const data = await api("admins");
-        const roleOptions = (data.roles || []).map((role) => '<option value="' + escapeHtml(role.role) + '">' + escapeHtml(role.label) + ' · Stage ' + role.stage + '</option>').join("");
+        const ADMIN_ROLE_OPTIONS = [{role:"super_admin",label:"Super Admin",stage:2},{role:"head_admin",label:"Head Admin",stage:3},{role:"senior_admin",label:"Senior Admin",stage:4},{role:"junior_admin",label:"Junior Admin",stage:5}];
+        const roleOptions = ADMIN_ROLE_OPTIONS.map((role) => '<option value="' + role.role + '">' + role.label + ' · Stage ' + role.stage + '</option>').join("");
         content.innerHTML = '<section class="sa-panel"><h2>Administrator access</h2><p>Only the Super God Admin can appoint, promote, demote, or disable administrators. Access changes are enforced by the server on every request.</p><form id="saAdminAdd" class="sa-toolbar" style="margin-top:14px"><input class="sa-search" id="saAdminEmail" type="email" placeholder="Account email" required aria-label="Account email"><select class="sa-search" id="saAdminRole" aria-label="Administrator stage">' + roleOptions + '</select><input class="sa-search" id="saAdminPassword" type="password" minlength="12" maxlength="128" autocomplete="new-password" placeholder="New password (12+ characters)" aria-label="New administrator password"><button class="sa-btn primary" id="saAdminCreate" type="button">Create admin account</button><button class="sa-btn" type="submit">Appoint existing account</button></form><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Administrator</th><th>Stage</th><th>Status</th><th>Change access</th></tr></thead><tbody>' +
         (data.admins || []).map((item) => '<tr><td><strong>' + escapeHtml(item.email) + '</strong><div class="sa-muted">' + escapeHtml(item.user_id) + '</div></td><td>' + escapeHtml(item.role.replace(/_/g, " ")) + '</td><td><span class="sa-status">' + (item.enabled ? "Enabled" : "Disabled") + '</span></td><td>' + (item.user_id === adminSession.admin.id ? '<span class="sa-muted">Your root account is protected</span>' : '<div class="sa-cell-actions"><select class="sa-search sa-admin-role" data-admin-email="' + escapeHtml(item.email) + '" aria-label="Change stage for ' + escapeHtml(item.email) + '">' + roleOptions.replace('value="' + escapeHtml(item.role) + '"', 'value="' + escapeHtml(item.role) + '" selected') + '</select><button class="sa-btn primary sa-small" data-admin-save="' + escapeHtml(item.email) + '">Save</button><button class="sa-btn danger sa-small" data-admin-enabled="' + escapeHtml(item.email) + '" data-enabled="' + String(item.enabled) + '">' + (item.enabled ? "Disable" : "Enable") + '</button></div>') + '</td></tr>').join("") +
         '</tbody></table></div></section>';
@@ -280,12 +281,17 @@
           const password = content.querySelector("#saAdminPassword").value;
           if (!email || password.length < 12) { notice("Enter an email and a new password with at least 12 characters."); return; }
           if (!confirm("Create a new Supabase login and assign " + role.replace(/_/g, " ") + " access to " + email + "?")) return;
+          const createButton = content.querySelector("#saAdminCreate");
+          createButton.disabled = true;
+          createButton.textContent = "Creating…";
+          notice("Creating administrator account…");
           try {
             await api("create_admin", { email, role, password });
             content.querySelector("#saAdminPassword").value = "";
-            notice("Admin account created. The new admin must confirm their email before signing in.");
+            notice("Admin account created. Email confirmation is required before sign-in.");
             await loadTab();
           } catch (error) { notice(error.message || "Could not create the admin account."); }
+          finally { createButton.disabled = false; createButton.textContent = "Create admin account"; }
         });
         content.querySelector("#saAdminAdd").addEventListener("submit", async (event) => {
           event.preventDefault();
