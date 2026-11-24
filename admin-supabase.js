@@ -54,6 +54,7 @@
     const policy = RESTRICTION_POLICY[selected.code];
     return { reason_code: selected.code, reason: policy.note, duration_hours: policy.hours, delete_at: new Date(Date.now() + policy.deletionDays * 86400000).toISOString(), policy };
   }
+  let adminSession = null;
   let activeTab = "overview";
   let usersPage = 1;
   let usersQuery = "";
@@ -68,7 +69,7 @@
     errorBox.hidden = !message;
   }
 
-  const READ_ACTIONS = new Set(["overview", "users", "blocked_users", "moderation_cases", "reports", "posts", "appeals", "verified_requests", "announcements", "notifications", "visitor_analytics", "errors", "system", "activity"]);
+  const READ_ACTIONS = new Set(["session", "admins", "overview", "users", "blocked_users", "moderation_cases", "reports", "posts", "appeals", "verified_requests", "announcements", "notifications", "visitor_analytics", "errors", "system", "activity"]);
   const responseCache = new Map();
   const pendingRequests = new Map();
   const CACHE_TTL_MS = 8000;
@@ -115,7 +116,15 @@
     }
   }
 
-  function showShell() {
+  async function showShell() {
+    try {
+      adminSession = await api("session");
+    } catch (error) {
+      await client.auth.signOut().catch(() => {});
+      gate.hidden = false;
+      setError(error.message || "Your administrator access could not be verified.");
+      return;
+    }
     gate.hidden = true;
     let root = document.getElementById("supabaseAdmin");
     if (!root) {
@@ -131,7 +140,7 @@
             <span class="sa-brand-mark" aria-hidden="true"><svg viewBox="0 0 64 64"><path fill="currentColor" d="M16 4h32a12 12 0 0 1 12 12v24a12 12 0 0 1-12 12H31L15 62V52a12 12 0 0 1-11-12V16A12 12 0 0 1 16 4z"/><g fill="#fff"><rect x="15" y="23" width="5" height="10" rx="2.5"/><rect x="24" y="16" width="5" height="24" rx="2.5"/><rect x="33" y="20" width="5" height="16" rx="2.5"/><rect x="42" y="24" width="5" height="8" rx="2.5"/></g></svg></span>
             <div><div class="sa-brand">murmur<span> / admin</span></div><div class="sa-muted" id="saIdentity">Secure administration workspace</div></div>
           </div>
-          <div class="sa-actions"><span class="sa-role">SUPER ADMIN</span><button class="sa-btn" id="saTheme" type="button" aria-label="Toggle theme">Theme</button><button class="sa-btn" id="saRefresh" type="button">Refresh data</button><button class="sa-btn" id="saSignOut" type="button">Sign out</button></div>
+          <div class="sa-actions"><span class="sa-role" id="saRoleBadge">ADMIN</span><button class="sa-btn" id="saTheme" type="button" aria-label="Toggle theme">Theme</button><button class="sa-btn" id="saRefresh" type="button">Refresh data</button><button class="sa-btn" id="saSignOut" type="button">Sign out</button></div>
         </header><nav class="sa-tabs" aria-label="Admin sections">
           <button class="sa-tab" data-tab="overview" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><rect x="3" y="3" width="8" height="8" rx="2"/><rect x="13" y="3" width="8" height="5" rx="2"/><rect x="13" y="10" width="8" height="11" rx="2"/><rect x="3" y="13" width="8" height="8" rx="2"/></svg></span>Overview</button>
           <button class="sa-tab" data-tab="users" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20c0-3.6 2.9-6 6.5-6s6.5 2.4 6.5 6"/><circle cx="17" cy="9" r="2.6"/><path d="M17 14c2.8 0 4.7 1.8 4.7 4.5"/></svg></span>Users</button>
@@ -147,10 +156,18 @@
           <button class="sa-tab" data-tab="system" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="13" rx="2"/><path d="M8 21h8m-4-4v4M7 9h3m4 0h3m-10 4h10"/></svg></span>System</button>
           <button class="sa-tab" data-tab="visitors" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><circle cx="17" cy="9" r="2.5"/><path d="M2.5 20c0-3.5 2.8-5.5 6.5-5.5s6.5 2 6.5 5.5M16 14c3 0 5.5 1.8 5.5 4.5"/></svg></span>Visitors</button>
           <button class="sa-tab" data-tab="activity" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>Activity</button>
+          <button class="sa-tab" data-tab="admins" type="button"><span class="sa-tab-icon"><svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="3"/><path d="M2 20c0-3.5 2.8-6 7-6s7 2.5 7 6M18 8v6m-3-3h6"/></svg></span>Admins</button>
         </nav></div>
         <div id="saNotice" class="sa-message" hidden role="status"></div>
         <section id="saContent" aria-live="polite"><div class="sa-empty">Loading secure dashboard…</div></section>
       </div>`;
+    root.querySelectorAll("[data-tab]").forEach((button) => {
+      const allowed = (adminSession.allowed_tabs || []).includes(button.dataset.tab);
+      button.hidden = !allowed;
+      if (!allowed && button.dataset.tab === activeTab) activeTab = "overview";
+    });
+    const roleBadge = root.querySelector("#saRoleBadge");
+    if (roleBadge) roleBadge.textContent = (adminSession.admin.role_label || adminSession.admin.role).toUpperCase();
     root.querySelectorAll("[data-tab]").forEach((button) => button.addEventListener("click", () => {
       activeTab = button.dataset.tab;
       notice("");
@@ -230,13 +247,37 @@
     const content = document.createElement("div");
     host.innerHTML = '<div class="sa-empty">Loading…</div>';
     try {
-      if (activeTab === "overview") {
+      if (activeTab === "admins") {
+        const data = await api("admins");
+        const roleOptions = (data.roles || []).map((role) => '<option value="' + escapeHtml(role.role) + '">' + escapeHtml(role.label) + ' · Stage ' + role.stage + '</option>').join("");
+        content.innerHTML = '<section class="sa-panel"><h2>Administrator access</h2><p>Only the Super God Admin can appoint, promote, demote, or disable administrators. Access changes are enforced by the server on every request.</p><form id="saAdminAdd" class="sa-toolbar" style="margin-top:14px"><input class="sa-search" id="saAdminEmail" type="email" placeholder="Registered Supabase account email" required aria-label="Registered Supabase account email"><select class="sa-search" id="saAdminRole" aria-label="Administrator stage">' + roleOptions + '</select><button class="sa-btn primary" type="submit">Appoint admin</button></form><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Administrator</th><th>Stage</th><th>Status</th><th>Change access</th></tr></thead><tbody>' +
+        (data.admins || []).map((item) => '<tr><td><strong>' + escapeHtml(item.email) + '</strong><div class="sa-muted">' + escapeHtml(item.user_id) + '</div></td><td>' + escapeHtml(item.role.replace(/_/g, " ")) + '</td><td><span class="sa-status">' + (item.enabled ? "Enabled" : "Disabled") + '</span></td><td>' + (item.user_id === adminSession.admin.id ? '<span class="sa-muted">Your root account is protected</span>' : '<div class="sa-cell-actions"><select class="sa-search sa-admin-role" data-admin-email="' + escapeHtml(item.email) + '" aria-label="Change stage for ' + escapeHtml(item.email) + '">' + roleOptions.replace('value="' + escapeHtml(item.role) + '"', 'value="' + escapeHtml(item.role) + '" selected') + '</select><button class="sa-btn primary sa-small" data-admin-save="' + escapeHtml(item.email) + '">Save</button><button class="sa-btn danger sa-small" data-admin-enabled="' + escapeHtml(item.email) + '" data-enabled="' + String(item.enabled) + '">' + (item.enabled ? "Disable" : "Enable") + '</button></div>') + '</td></tr>').join("") +
+        '</tbody></table></div></section>';
+        content.querySelector("#saAdminAdd").addEventListener("submit", async (event) => {
+          event.preventDefault();
+          const email = content.querySelector("#saAdminEmail").value.trim();
+          const role = content.querySelector("#saAdminRole").value;
+          await actionRun(() => api("set_admin_role", { email, role, enabled: true }), "Administrator appointed with the selected stage.");
+        });
+        content.querySelectorAll("[data-admin-save]").forEach((button) => button.addEventListener("click", async () => {
+          const email = button.dataset.adminSave;
+          const role = content.querySelector('[data-admin-email="' + CSS.escape(email) + '"]').value;
+          await actionRun(() => api("set_admin_role", { email, role, enabled: true }), "Administrator stage updated. Their access has changed immediately.");
+        }));
+        content.querySelectorAll("[data-admin-enabled]").forEach((button) => button.addEventListener("click", async () => {
+          const enabled = button.dataset.enabled !== "true";
+          if (!confirm((enabled ? "Enable" : "Disable") + " administrator access for " + button.dataset.adminEnabled + "?")) return;
+          const current = (data.admins || []).find((item) => item.email === button.dataset.adminEnabled);
+          if (!current) return;
+          await actionRun(() => api("set_admin_role", { email: current.email, role: current.role, enabled }), enabled ? "Administrator enabled." : "Administrator disabled.");
+        }));
+      } else if (activeTab === "overview") {
         const data = await api("overview");
-        document.getElementById("saIdentity").textContent = data.admin.email + " · " + data.admin.role;
+        document.getElementById("saIdentity").textContent = data.admin.email + " · " + (adminSession.admin.role_label || data.admin.role);
         content.innerHTML = '<div class="sa-section-heading"><div><span class="sa-kicker">CONTROL CENTER</span><h1>Overview</h1><p>Monitor your Murmur community and system activity.</p></div><span class="sa-live"><i></i> Connected session</span></div><div class="sa-grid">' + Object.entries(data.counts).map(([name, count]) =>
           '<article class="sa-card"><div class="sa-card-top"><span class="sa-muted">' + escapeHtml(name.replace(/_/g, " ")) +
           '</span><span class="sa-card-dot"></span></div><div class="sa-number">' + Number(count).toLocaleString() + '</div><div class="sa-card-foot">Current records</div></article>'
-        ).join("") + '</div><section class="sa-panel sa-security-panel"><div class="sa-security-mark"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg></div><div><h2>Administration protected</h2><p>Supabase Auth is active. Every privileged action is checked by the server-side Super Admin allowlist.</p></div></section>';
+        ).join("") + '</div><section class="sa-panel sa-security-panel"><div class="sa-security-mark"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="m5 12 5 5 9-10"/></svg></div><div><h2>Administration protected</h2><p>Supabase Auth is active. Every section and action is checked against your current administrator stage on the server.</p></div></section>';
       } else if (activeTab === "users") {
         const data = await api("users", { page: usersPage, q: usersQuery, status: usersStatus });
         content.innerHTML = '<section class="sa-panel"><div class="sa-toolbar"><h2>Users</h2><form id="saUserSearch" class="sa-actions"><input class="sa-search" id="saSearch" type="search" value="' + escapeHtml(usersQuery) + '" placeholder="Search username, name, email or ID" aria-label="Search users"><select class="sa-search" id="saUserStatus" aria-label="Filter account status"><option value="all">All accounts</option><option value="active">Active</option><option value="suspended">Suspended</option></select><button class="sa-btn primary" type="submit">Search</button></form></div><div class="sa-table-wrap"><table class="sa-table"><thead><tr><th>Account / username</th><th>Created</th><th>Status</th><th>Action</th></tr></thead><tbody>' +
@@ -564,7 +605,7 @@
       if (window.MurmurErrors) window.MurmurErrors.report("handled", error, { page: "admin-" + activeTab });
       host.innerHTML = '<div class="sa-empty" role="alert">' + escapeHtml(error.message || "Could not load this section.") + '</div>';
       if (error.status === 401 || error.status === 403) {
-        notice("Access check failed. Please sign in with the authorized Super Admin account.");
+        notice("Access check failed. This section is not available at your current administrator stage.");
       }
     }
   }
