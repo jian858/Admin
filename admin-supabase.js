@@ -179,7 +179,7 @@
     root.querySelector("#saTheme").addEventListener("click", toggleTheme);
     loadTab();
     if (window.MurmurErrors) window.MurmurErrors.flush();
-    if ((adminSession.allowed_tabs || []).includes("visitors")) startVisitorLiveUpdates();
+    if (adminSession.is_root && (adminSession.allowed_tabs || []).includes("visitors")) startVisitorLiveUpdates();
     if (permissionRefreshTimer) clearInterval(permissionRefreshTimer);
     permissionRefreshTimer = setInterval(() => refreshAdminPermissions(), 30000);
   }
@@ -255,7 +255,7 @@
       if (roleBadge) roleBadge.textContent = (adminSession.admin.role_label || adminSession.admin.role).toUpperCase();
       if (!(adminSession.allowed_tabs || []).includes(activeTab)) activeTab = "overview";
       updateTabs();
-      if (previousRole !== adminSession.admin.role || !document.querySelector('[data-tab="' + CSS.escape(activeTab) + '"]')) loadTab();
+      if (previousRole !== adminSession.admin.role || activeTab === "visitors" || !document.querySelector('[data-tab="' + CSS.escape(activeTab) + '"]')) loadTab();
     } catch (error) {
       if (error.status === 401 || error.status === 403) await signOut();
     }
